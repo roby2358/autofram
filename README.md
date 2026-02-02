@@ -2,10 +2,31 @@
 
 A sandboxed, self-modifying AI agent that communicates with the outside world exclusively through git.
 
+## How It Works
+
+The agent runs in an isolated container and communicates via a shared bare git repository:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   ~/autofram-remote/        (bare repo - the shared "hub")  │
+│         ▲           ▲                                       │
+│         │           │                                       │
+│    push/pull    push/pull                                   │
+│         │           │                                       │
+│         ▼           ▼                                       │
+│   Container      ~/autofram-working/   (your working copy)  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **Bare repo** (`~/autofram-remote/`): A hub with no working tree. You never edit files here directly.
+- **Container**: The agent clones from the bare repo, does work, and pushes changes back.
+- **Your working copy** (`~/autofram-working/`): Where you edit `COMMS.md` to give directives and pull to see the agent's responses.
+
 ## Prerequisites
 
 - Podman
-- A bare git repository for agent communication
 
 ## Setup
 
@@ -95,7 +116,7 @@ cat /agent/main/autofram/logs/watcher.log
 
 ## Communicating with the Agent
 
-1. Clone the working copy:
+1. Clone the working copy (one-time setup):
 
 ```bash
 git clone ~/autofram-remote ~/autofram-working
@@ -105,22 +126,38 @@ cd ~/autofram-working
 2. Edit `COMMS.md` with your directives:
 
 ```bash
-vi COMMS.md
+vim COMMS.md
 ```
 
 3. Push your changes:
 
 ```bash
-git add COMMS.md
-git commit -m "Add directive"
-git push
+git add COMMS.md && git commit -m "Add directive" && git push
 ```
 
-4. Pull to see agent responses:
+4. The agent checks for updates every 10 minutes (aligned to :00, :10, :20, etc.)
+
+5. Pull to see agent responses:
 
 ```bash
 git pull
 cat COMMS.md
+```
+
+## Status Server
+
+The container exposes a status endpoint at `http://localhost:8080/status`:
+
+```bash
+curl localhost:8080/status
+```
+
+Returns:
+```
+timestamp: 2024-01-15 10:30:45
+branch: main
+watcher: pid=123 status=sleeping uptime=1h 5m 30s
+runner: pid=456 status=running uptime=0h 58m 12s
 ```
 
 ## Environment Variables
