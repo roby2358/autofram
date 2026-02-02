@@ -43,11 +43,11 @@ class TestRunnerInit:
             runner = Runner()
             assert runner.model == "custom-model"
 
-    def test_default_model(self):
-        """Should use default model if not in environment."""
+    def test_model_none_when_not_set(self):
+        """Should have None model if not in environment."""
         with patch.dict(os.environ, {}, clear=True):
             runner = Runner()
-            assert runner.model == "anthropic/claude-sonnet-4-5"
+            assert runner.model is None
 
 
 class TestLoadFileContent:

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from duckduckgo_search import DDGS
+
 from autofram.filesystem import FileSystem
 from autofram.git import Git
 
@@ -71,11 +73,17 @@ def format_bash_output(result: subprocess.CompletedProcess) -> str:
 def read_file(path: str) -> str:
     """Read the contents of a file.
 
+    Use this to inspect source code, configuration files, COMMS.md, logs, or any
+    text file. Always read files before modifying them.
+
     Args:
         path: Path to the file to read (relative to working directory or absolute)
 
     Returns:
         The contents of the file as a string
+
+    Raises:
+        FileNotFoundError: If the file does not exist
     """
     file_path = FileSystem.resolve_path(path)
 
@@ -89,12 +97,16 @@ def read_file(path: str) -> str:
 def write_file(path: str, content: str) -> str:
     """Write content to a file, creating directories if needed.
 
+    Use this to create or overwrite files. Parent directories are created
+    automatically. For modifying existing files, read them first to understand
+    their current content.
+
     Args:
         path: Path to the file to write (relative to working directory or absolute)
-        content: The content to write to the file
+        content: The complete content to write (overwrites existing content)
 
     Returns:
-        Confirmation message
+        Confirmation message with bytes written
     """
     file_path = FileSystem.resolve_path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,11 +118,23 @@ def write_file(path: str, content: str) -> str:
 def bash(command: str) -> str:
     """Execute a shell command and return the output.
 
+    Use this for git operations, running tests, installing dependencies, or any
+    shell command. Commands run in the current working directory.
+
+    Common uses:
+    - Git: git status, git add, git commit, git push, git pull, git checkout
+    - Testing: uv run pytest
+    - Directory listing: ls, find
+    - Process info: ps, which
+
     Args:
         command: The bash command to execute
 
     Returns:
-        Combined stdout and stderr output from the command
+        Combined stdout and stderr output, plus exit code if non-zero
+
+    Note:
+        Commands timeout after 5 minutes. Long-running commands should be avoided.
     """
     result = subprocess.run(
         command,
@@ -127,10 +151,25 @@ def bootstrap(branch: str) -> None:
     """Clone/update target branch and exec its runner, replacing this process.
 
     This implements the hop-scotch upgrade pattern. The current process is
-    replaced with the runner from the target branch.
+    replaced with the runner from the target branch. Use this to switch to
+    a different version of your code after making and pushing changes.
+
+    IMPORTANT: Always commit and push your changes before calling bootstrap.
+    Uncommitted changes will be lost when the process is replaced.
+
+    Typical workflow:
+    1. Create a feature branch
+    2. Make and test changes
+    3. Commit and push to the branch
+    4. Call bootstrap(branch) to switch to the new code
+    5. After verifying stability, merge to main
+    6. Call bootstrap("main") to return to main
 
     Args:
-        branch: The git branch to bootstrap to
+        branch: The git branch to bootstrap to (must exist on remote)
+
+    Note:
+        This function does not return - it replaces the current process.
     """
     target_dir = Git.get_branch_dir(branch)
     clone_or_update_branch(branch, target_dir)
@@ -142,13 +181,53 @@ def bootstrap(branch: str) -> None:
 def rollback() -> None:
     """Bootstrap to main branch to recover from a bad state.
 
-    Use this when the current branch is broken. The runner on main can then
-    investigate the feature branch, fix issues, or delete it and start over.
+    Use this when the current branch is broken or unstable. This is equivalent
+    to calling bootstrap("main") but with clearer intent for error recovery.
+
+    After rollback, you will be running from main and can:
+    - Investigate what went wrong on the feature branch
+    - Fix issues and push corrections
+    - Delete the problematic branch and start fresh
+
+    Note:
+        This function does not return - it replaces the current process.
     """
     target_dir = Git.get_branch_dir("main")
     clone_or_update_branch("main", target_dir)
     (target_dir / "logs").mkdir(exist_ok=True)
     exec_runner(target_dir)
+
+
+@mcp.tool()
+def web_search(query: str, max_results: int = 5) -> str:
+    """Search the web using DuckDuckGo.
+
+    Use this to find documentation, research solutions, look up error messages,
+    or gather information about libraries and APIs. Results include titles,
+    URLs, and text snippets.
+
+    Args:
+        query: The search query (be specific for better results)
+        max_results: Maximum number of results to return (default 5)
+
+    Returns:
+        Formatted search results with titles, URLs, and snippets separated by ---
+
+    Example queries:
+        "Python subprocess timeout example"
+        "FastMCP tool schema format"
+        "git rebase vs merge best practices"
+    """
+    results = DDGS().text(query, max_results=max_results)
+
+    if not results:
+        return "No results found."
+
+    formatted = []
+    for r in results:
+        formatted.append(f"**{r['title']}**\n{r['href']}\n{r['body']}\n")
+
+    return "\n---\n".join(formatted)
 
 
 def get_tools_for_openai() -> list[dict]:
