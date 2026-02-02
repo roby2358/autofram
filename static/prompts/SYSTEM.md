@@ -124,6 +124,7 @@ Tests live in `/tests/` and cover the core modules. Always run the full test sui
 - `logs/errors.log` - Captured stderr and errors (truncated on each restart)
 - `logs/bootstrap.log` - Bootstrap attempts and outcomes
 - `logs/watcher.log` - Watcher operational events
+- `logs/model.log` - All LLM API requests and responses (JSONL format)
 
 These logs are not committed to git. Review them to debug issues.
 

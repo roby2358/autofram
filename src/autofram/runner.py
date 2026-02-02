@@ -40,6 +40,7 @@ class Runner:
         self.logs_dir = self.working_dir / "logs"
         self.bootstrap_log = self.logs_dir / "bootstrap.log"
         self.errors_log = self.logs_dir / "errors.log"
+        self.model_log = self.logs_dir / "model.log"
 
         self.api_key = os.environ.get("OPENROUTER_API_KEY")
         self.model = os.environ.get("OPENROUTER_MODEL")
@@ -60,6 +61,22 @@ class Runner:
         self.logs_dir.mkdir(exist_ok=True)
         self.errors_log.write_text("")
         sys.stderr = open(self.errors_log, "a")
+
+    def log_model(self, direction: str, data: dict) -> None:
+        """Log a model API request or response to model.log.
+
+        Args:
+            direction: Either "request" or "response"
+            data: The request or response data to log
+        """
+        self.logs_dir.mkdir(exist_ok=True)
+        entry = {
+            "timestamp": FileSystem.format_timestamp(),
+            "direction": direction,
+            "data": data,
+        }
+        with open(self.model_log, "a") as f:
+            f.write(json.dumps(entry) + "\n")
 
     def load_file_content(self, path: Path, default: str) -> str:
         """Load file content or return default if not found."""
@@ -149,6 +166,8 @@ class Runner:
 
         # Handle nested tool calls
         while True:
+            self.log_model("request", {"messages": messages, "tools": self.tools})
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -156,6 +175,7 @@ class Runner:
                 tool_choice="auto",
             )
             follow_up = response.choices[0].message
+            self.log_model("response", follow_up.model_dump())
 
             if not follow_up.tool_calls:
                 if follow_up.content:
@@ -190,6 +210,8 @@ class Runner:
         messages = self.build_messages(system_prompt)
 
         print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Calling LLM...")
+        self.log_model("request", {"messages": messages, "tools": self.tools})
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -198,6 +220,7 @@ class Runner:
         )
 
         message = response.choices[0].message
+        self.log_model("response", message.model_dump())
 
         if message.tool_calls:
             self.process_tool_calls(message, messages)
