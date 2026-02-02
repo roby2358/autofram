@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     nftables \
+    postgresql \
     procps \
     vim \
     && rm -rf /var/lib/apt/lists/*

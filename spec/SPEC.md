@@ -286,6 +286,9 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 - FastAPI and uvicorn for status server
 - Third-party OSS libraries preferred over custom implementations
 
+**Available Services:**
+- PostgreSQL is installed in the container and available for agent use if needed
+
 ## Configuration
 
 ### Environment Variables
