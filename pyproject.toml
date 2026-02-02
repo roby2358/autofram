@@ -1,0 +1,23 @@
+[project]
+name = "autofram"
+version = "0.1.0"
+description = "Self-modifying autonomous agent system"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp>=1.26,<2",
+    "openai",
+    "python-dotenv",
+    "psutil",
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autofram"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
