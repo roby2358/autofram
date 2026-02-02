@@ -4,11 +4,13 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
+    less \
     nftables \
     postgresql \
     procps \
     vim \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "alias ll='ls -lA'" >> /etc/bash.bashrc
 
 # Install uv package manager
 RUN pip install --no-cache-dir uv

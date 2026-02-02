@@ -46,7 +46,7 @@ AUTOFRAM_REMOTE=~/autofram-remote
 3. Create the bare git repository (use the path from `AUTOFRAM_REMOTE`):
 
 ```bash
-git init --bare ~/autofram-remote
+git init --bare -b main ~/autofram-remote
 ```
 
 4. Push this repository to the remote:

@@ -20,7 +20,8 @@ for var in $REQUIRED_VARS; do
     fi
 done
 
-REMOTE_REPO="$AUTOFRAM_REMOTE"
+# Expand tilde in path (~ doesn't expand when loaded from .env)
+REMOTE_REPO="${AUTOFRAM_REMOTE/#\~/$HOME}"
 
 usage() {
     echo "Usage: $0 {build|run|stop|logs|shell}"
