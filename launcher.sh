@@ -10,15 +10,17 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
 fi
 
-# Check for required environment variable
-if [ -z "$OPENROUTER_API_KEY" ]; then
-    echo "Error: OPENROUTER_API_KEY is not set"
-    echo "Please create a .env file with OPENROUTER_API_KEY=your_key_here"
-    exit 1
-fi
+# Check for required environment variables
+REQUIRED_VARS="OPENROUTER_API_KEY OPENROUTER_MODEL GIT_USER_NAME GIT_USER_EMAIL AUTOFRAM_REMOTE"
+for var in $REQUIRED_VARS; do
+    if [ -z "${!var}" ]; then
+        echo "Error: $var is not set"
+        echo "Please set all required variables in .env (see .env.example)"
+        exit 1
+    fi
+done
 
-# Default remote repo location
-REMOTE_REPO="${AUTOFRAM_REMOTE:-$HOME/autofram-remote}"
+REMOTE_REPO="$AUTOFRAM_REMOTE"
 
 usage() {
     echo "Usage: $0 {build|run|stop|logs|shell}"
@@ -30,8 +32,7 @@ usage() {
     echo "  logs    Show container logs"
     echo "  shell   Open a shell in the running container"
     echo ""
-    echo "Environment variables:"
-    echo "  AUTOFRAM_REMOTE   Path to bare git repo (default: ~/autofram-remote)"
+    echo "All variables in .env are required. See .env.example."
 }
 
 build() {
@@ -55,9 +56,9 @@ run() {
         --security-opt=no-new-privileges \
         -v "$REMOTE_REPO:/mnt/remote:z" \
         -e "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
-        -e "OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-sonnet-4-5}" \
-        -e "GIT_USER_NAME=${GIT_USER_NAME:-autofram}" \
-        -e "GIT_USER_EMAIL=${GIT_USER_EMAIL:-autofram@localhost}" \
+        -e "OPENROUTER_MODEL=$OPENROUTER_MODEL" \
+        -e "GIT_USER_NAME=$GIT_USER_NAME" \
+        -e "GIT_USER_EMAIL=$GIT_USER_EMAIL" \
         "$IMAGE_NAME"
 
     echo "Container started. View logs with: $0 logs"

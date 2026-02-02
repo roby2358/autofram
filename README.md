@@ -15,13 +15,14 @@ A sandboxed, self-modifying AI agent that communicates with the outside world ex
 cp .env.example .env
 ```
 
-2. Edit `.env` and add your OpenRouter API key:
+2. Edit `.env` and configure:
 
 ```
 OPENROUTER_API_KEY=your_key_here
+AUTOFRAM_REMOTE=~/autofram-remote
 ```
 
-3. Create the bare git repository:
+3. Create the bare git repository (use the path from `AUTOFRAM_REMOTE`):
 
 ```bash
 git init --bare ~/autofram-remote
@@ -124,10 +125,12 @@ cat COMMS.md
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| OPENROUTER_API_KEY | Yes | - | API key for OpenRouter |
-| OPENROUTER_MODEL | No | anthropic/claude-sonnet-4-5 | Model identifier |
-| GIT_USER_NAME | No | autofram | Git commit author name |
-| GIT_USER_EMAIL | No | autofram@localhost | Git commit author email |
-| AUTOFRAM_REMOTE | No | ~/autofram-remote | Path to bare git repo |
+All variables are required. See `.env.example` for reference.
+
+| Variable | Description |
+|----------|-------------|
+| OPENROUTER_API_KEY | API key for OpenRouter |
+| OPENROUTER_MODEL | Model identifier (e.g., `anthropic/claude-sonnet-4-5`) |
+| GIT_USER_NAME | Git commit author name |
+| GIT_USER_EMAIL | Git commit author email |
+| AUTOFRAM_REMOTE | Path to bare git repo |

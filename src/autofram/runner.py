@@ -42,7 +42,7 @@ class Runner:
         self.errors_log = self.logs_dir / "errors.log"
 
         self.api_key = os.environ.get("OPENROUTER_API_KEY")
-        self.model = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-5")
+        self.model = os.environ.get("OPENROUTER_MODEL")
 
         self.client: OpenAI | None = None
         self.tools: list[dict] | None = None
