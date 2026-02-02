@@ -16,7 +16,7 @@ This system provides a secure environment for an AI agent to write, test, and de
 ┌─────────────────────────────────────────────────────────────────┐
 │  Host Machine                                                   │
 │                                                                 │
-│  /home/user/autofram-remote/  (bare git repo)                      │
+│  /home/user/autofram-remote/  (bare git repo)                   │
 │         ▲                                                       │
 │         │ bind mount                                            │
 │         ▼                                                       │
@@ -25,19 +25,24 @@ This system provides a secure environment for an AI agent to write, test, and de
 │  │                                                         │    │
 │  │  /mnt/remote  ◄──────────────────────────────────────┐  │    │
 │  │                                                      │  │    │
-│  │  /agent                                                │  │    │
+│  │  /agent                                              │  │    │
 │  │    /main                                             │  │    │
-│  │      /autofram  (working directory) ◄── git pull/push ──┘  │    │
-│  │    /feature-x                                           │    │
-│  │      /autofram  (experimental branch)                      │    │
+│  │      /autofram  (working directory) ◄── git pull/push ┘  │    │
+│  │    /feature-x                                        │    │
+│  │      /autofram  (experimental branch)                │    │
 │  │                                                         │    │
 │  │  Processes (separate, concurrent):                      │    │
+│  │    - server.py  (status API on port 8080)               │    │
 │  │    - watcher.py (monitors agent, handles crashes)       │    │
 │  │    - runner.py  (LLM loop, executes agent logic)        │    │
 │  │                                                         │    │
-│  └─────────────────────────────────────────────────────────┘    │
+│  └────────────────────────────────┬────────────────────────┘    │
+│                                   │                             │
+│                              port 8080                          │
+│                                   │                             │
+│                              curl localhost:8080/status         │
 │                                                                 │
-│  /home/user/autofram-working/  (user's working copy)               │
+│  /home/user/autofram-working/  (user's working copy)            │
 │    - User edits COMMS.md, pushes                                │
 │    - User reviews branches, merges                              │
 │                                                                 │
@@ -55,7 +60,8 @@ This system provides a secure environment for an AI agent to write, test, and de
 │   └── SPEC_*.md          # Specifications (read into context as needed)
 ├── /infra
 │   ├── runner.py          # Agent LLM loop
-│   └── watcher.py         # Process monitor (crash recovery only)
+│   ├── watcher.py         # Process monitor (crash recovery only)
+│   └── server.py          # Status API server
 ├── /src
 │   └── ...                # Agent code and any project code
 └── /logs                  # .gitignored
@@ -177,6 +183,31 @@ The watcher handles crash recovery only. Bootstrap and rollback are handled by t
 - If the agent crashes 5 times within 60 minutes, the watcher MUST stop restarting and alert via COMMS.md
 - The watcher MAY append critical messages to COMMS.md when intervention is needed
 
+### Status Server
+
+- The status server MUST expose an HTTP endpoint at `/status` on port 8080
+- The status server MUST return plain text responses
+- The `/status` endpoint MUST return:
+  - Current timestamp
+  - Branch name the runner was launched from
+  - Process information for watcher and runner (PID, status, uptime)
+- The status server MUST run as a separate background process
+- The status port MUST be exposed to the host via port mapping
+- The branch name MUST be passed to the server via the `AUTOFRAM_BRANCH` environment variable
+
+**Status Response Format:**
+```
+timestamp: 2024-01-15 10:30:45
+branch: main
+watcher: pid=123 status=sleeping uptime=1h 5m 30s
+runner: pid=456 status=running uptime=0h 58m 12s
+```
+
+If a process is not running:
+```
+watcher: not running
+```
+
 ### File Formats
 
 **Bootstrap Log Format (bootstrap.log):**
@@ -233,6 +264,7 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 - All agent errors MUST be captured to a readable log file
 - All bootstrap attempts MUST be logged with timestamps and outcomes
 - The PM MUST be able to review agent activity through git history
+- The status server MUST provide real-time process status via HTTP
 
 ## Dependencies
 
@@ -251,6 +283,7 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 - Python for watcher and runner infrastructure
 - LLM API via OpenRouter (default model: Claude Sonnet 4.5)
 - MCP (Model Context Protocol) for tool exposure
+- FastAPI and uvicorn for status server
 - Third-party OSS libraries preferred over custom implementations
 
 ## Configuration
@@ -265,6 +298,8 @@ The following environment variables MUST be supported:
 | OPENROUTER_MODEL | No | anthropic/claude-sonnet-4.5 | Model identifier for OpenRouter |
 | GIT_USER_NAME | No | autofram | Git commit author name |
 | GIT_USER_EMAIL | No | autofram@company.com | Git commit author email |
+| AUTOFRAM_STATUS_PORT | No | 8080 | Port for the status server |
+| AUTOFRAM_BRANCH | No | (set by entrypoint) | Branch name for status server |
 
 ### .env File
 
@@ -284,6 +319,8 @@ The following environment variables MUST be supported:
 
 - The container entry point MUST clone the repo from /mnt/remote to /agent/main/autofram on first start
 - Git user.name and user.email MUST be configured from environment variables before any git operations
+- The entry point MUST determine the current branch and set AUTOFRAM_BRANCH
+- The entry point MUST start server.py as a background process
 - The entry point MUST start watcher.py as a background process
 - The entry point MUST then exec runner.py in the foreground
 - The watcher finds the runner by scanning for the process by name (no PID files needed)

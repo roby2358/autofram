@@ -10,6 +10,8 @@ dependencies = [
     "psutil",
     "pytest>=8.0",
     "duckduckgo-search>=7.0",
+    "fastapi",
+    "uvicorn",
 ]
 
 [build-system]

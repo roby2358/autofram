@@ -25,5 +25,8 @@ RUN uv pip install --system -e .
 # Make entrypoint executable
 RUN chmod +x entrypoint.sh
 
+# Expose status server port
+EXPOSE 8080
+
 # Set entrypoint
 CMD ["/app/entrypoint.sh"]

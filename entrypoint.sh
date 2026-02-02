@@ -30,6 +30,12 @@ mkdir -p /agent/main/autofram/logs
 # Change to working directory
 cd /agent/main/autofram
 
+# Determine current branch for status server
+export AUTOFRAM_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Start status server as background process
+python /agent/main/autofram/src/autofram/server.py &
+
 # Start watcher as background process
 python /agent/main/autofram/src/autofram/watcher.py &
 

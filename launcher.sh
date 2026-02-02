@@ -55,6 +55,7 @@ run() {
         --cap-add=NET_ADMIN \
         --security-opt=no-new-privileges \
         -v "$REMOTE_REPO:/mnt/remote:z" \
+        -p 8080:8080 \
         -e "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
         -e "OPENROUTER_MODEL=$OPENROUTER_MODEL" \
         -e "GIT_USER_NAME=$GIT_USER_NAME" \
