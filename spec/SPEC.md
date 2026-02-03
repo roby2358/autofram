@@ -53,17 +53,22 @@ This system provides a secure environment for an AI agent to write, test, and de
 
 ```
 /agent/<branch>/autofram/
-├── SYSTEM.md              # Base system prompt
+├── bootstrap.sh           # Startup script (agent-modifiable)
 ├── COMMS.md               # Directives and reports
+├── pyproject.toml         # Python dependencies
 ├── .gitignore             # Excludes logs/
+├── /static
+│   └── /prompts
+│       └── SYSTEM.md      # Base system prompt
 ├── /spec
 │   └── SPEC_*.md          # Specifications (read into context as needed)
-├── /infra
+├── /src/autofram          # Orchestration code (agent-modifiable)
 │   ├── runner.py          # Agent LLM loop
 │   ├── watcher.py         # Process monitor (crash recovery only)
-│   └── server.py          # Status API server
-├── /src
-│   └── ...                # Agent code and any project code
+│   ├── server.py          # Status API server
+│   ├── tools.py           # MCP tool definitions
+│   ├── git.py             # Git utilities
+│   └── filesystem.py      # Filesystem utilities
 └── /logs                  # .gitignored
     ├── bootstrap.log      # Bootstrap attempts and outcomes
     ├── errors.log         # Captured errors and stderr
@@ -161,8 +166,8 @@ SYSTEM.md MUST establish:
 
 ### Work Loop
 
-- The agent MUST check COMMS.md for new directives at minimum every 10 minutes
-- Work intervals MUST be aligned to clock time (:00, :10, :20, :30, :40, :50)
+- The agent MUST check COMMS.md for new directives at the configured interval (WORK_INTERVAL_MINUTES)
+- Work intervals MUST be aligned to clock time (e.g., with 1-minute interval: :00, :01, :02, ...)
 - After completing work, the agent MUST sleep until the next aligned interval
 - If work extends past an interval boundary, the agent MUST continue working and wait for the next interval
 - A unit of work MAY span multiple files and include coding, testing, and validation
@@ -300,9 +305,10 @@ The following environment variables MUST be supported:
 | OPENROUTER_API_KEY | Yes | - | API key for OpenRouter LLM access |
 | OPENROUTER_MODEL | No | anthropic/claude-sonnet-4.5 | Model identifier for OpenRouter |
 | GIT_USER_NAME | No | autofram | Git commit author name |
-| GIT_USER_EMAIL | No | autofram@company.com | Git commit author email |
+| GIT_USER_EMAIL | No | autofram@localhost | Git commit author email |
+| WORK_INTERVAL_MINUTES | No | 1 | Minutes between work loop iterations |
 | AUTOFRAM_STATUS_PORT | No | 8080 | Port for the status server |
-| AUTOFRAM_BRANCH | No | (set by entrypoint) | Branch name for status server |
+| AUTOFRAM_BRANCH | No | (set by bootstrap.sh) | Branch name for status server |
 
 ### .env File
 
@@ -320,14 +326,24 @@ The following environment variables MUST be supported:
 
 ### Container Initialization
 
-- The container entry point MUST clone the repo from /mnt/remote to /agent/main/autofram on first start
-- Git user.name and user.email MUST be configured from environment variables before any git operations
-- The entry point MUST determine the current branch and set AUTOFRAM_BRANCH
-- The entry point MUST start server.py as a background process
-- The entry point MUST start watcher.py as a background process
-- The entry point MUST then exec runner.py in the foreground
-- The watcher finds the runner by scanning for the process by name (no PID files needed)
-- The watcher monitors for crashes and resource abuse; it does not manage bootstrap/rollback
+The container uses a two-stage startup: a static bootloader (entrypoint.sh) hands off to an agent-modifiable bootstrap script (bootstrap.sh).
+
+**Stage 1: entrypoint.sh (static, baked into container)**
+- Load .env from /mnt/remote if present
+- Configure git user.name and user.email from environment variables
+- Configure nftables for network isolation (security-critical, not agent-modifiable)
+- Clone the repo from /mnt/remote to /agent/main/autofram on first start
+- Exec bootstrap.sh from the cloned repo
+
+**Stage 2: bootstrap.sh (agent-modifiable, lives in repo)**
+- Install Python dependencies via `uv pip install --system -e .`
+- Create logs directory
+- Determine current branch and set AUTOFRAM_BRANCH
+- Start server.py as a background process
+- Start watcher.py as a background process
+- Exec runner.py in the foreground
+
+This architecture allows the agent to modify how it starts up (bootstrap.sh, dependencies, orchestration code) while keeping security-critical network isolation static in the container.
 
 ## Implementation Notes
 
@@ -339,9 +355,20 @@ Phase 1 uses a bind-mounted bare git repository for simplicity. No authenticatio
 
 Only one agent process runs at a time to simplify watcher logic. The watcher cannot distinguish between multiple agent processes, so the hop-scotch pattern ensures clean handoffs.
 
+### Self-Modifying Architecture
+
+The container has a minimal static layer (entrypoint.sh) and everything else lives in the git repository. This means the agent can modify:
+
+- **bootstrap.sh** - How the system starts up
+- **pyproject.toml** - Python dependencies
+- **src/autofram/*.py** - All orchestration code (runner, watcher, server, tools)
+- **static/prompts/SYSTEM.md** - Its own system prompt
+
+Only entrypoint.sh and network isolation rules are baked into the container image. When bootstrap() or rollback() is called, the new branch's bootstrap.sh runs, installing any new dependencies and starting the updated orchestration code.
+
 ### Watcher Architecture
 
-The watcher code lives in the git repository alongside agent code but runs as a separate process. This is a YOLO design choice: the watcher can theoretically be upgraded by the agent, but in practice it should remain stable and rarely change. If a watcher upgrade breaks the watcher, manual intervention is required. The watcher has its own implicit bootstrap - it starts from /agent/main/autofram/infra/watcher.py and is not subject to the hop-scotch pattern.
+The watcher code lives in the git repository alongside agent code but runs as a separate process. This is a YOLO design choice: the watcher can theoretically be upgraded by the agent, but in practice it should remain stable and rarely change. If a watcher upgrade breaks the watcher, manual intervention is required. The watcher starts from /agent/main/autofram/src/autofram/watcher.py and is not subject to the hop-scotch pattern.
 
 The watcher is designed to be minimal. It only monitors for crashes and resource abuse. Bootstrap and rollback are handled entirely by the runner via exec - the watcher is not involved in normal branch transitions. This keeps the watcher simple and reduces coordination complexity.
 

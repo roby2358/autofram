@@ -18,15 +18,20 @@ mcp = FastMCP("autofram")
 BASH_TIMEOUT = 300  # 5 minutes
 
 
-def exec_runner(target_dir: Path) -> None:
-    """Replace current process with runner from target directory.
+def exec_bootstrap(target_dir: Path) -> None:
+    """Replace current process with bootstrap.sh from target directory.
+
+    This runs the target branch's bootstrap.sh which handles:
+    - Installing dependencies (may have changed in the new branch)
+    - Starting server and watcher
+    - Launching the runner
 
     Args:
-        target_dir: Directory containing the runner to exec
+        target_dir: Directory containing the bootstrap.sh to exec
     """
-    runner_path = target_dir / "src" / "autofram" / "runner.py"
+    bootstrap_path = target_dir / "bootstrap.sh"
     os.chdir(target_dir)
-    os.execv(sys.executable, [sys.executable, str(runner_path)])
+    os.execv("/bin/bash", ["/bin/bash", str(bootstrap_path)])
 
 
 def clone_or_update_branch(branch: str, target_dir: Path) -> None:
@@ -173,8 +178,7 @@ def bootstrap(branch: str) -> None:
     """
     target_dir = Git.get_branch_dir(branch)
     clone_or_update_branch(branch, target_dir)
-    (target_dir / "logs").mkdir(exist_ok=True)
-    exec_runner(target_dir)
+    exec_bootstrap(target_dir)
 
 
 @mcp.tool()
@@ -194,8 +198,7 @@ def rollback() -> None:
     """
     target_dir = Git.get_branch_dir("main")
     clone_or_update_branch("main", target_dir)
-    (target_dir / "logs").mkdir(exist_ok=True)
-    exec_runner(target_dir)
+    exec_bootstrap(target_dir)
 
 
 @mcp.tool()

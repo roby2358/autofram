@@ -24,14 +24,15 @@ done
 REMOTE_REPO="${AUTOFRAM_REMOTE/#\~/$HOME}"
 
 usage() {
-    echo "Usage: $0 {build|run|stop|logs|shell}"
+    echo "Usage: $0 {build|run|stop|rebuild|logs|shell}"
     echo ""
     echo "Commands:"
-    echo "  build   Build the container image"
-    echo "  run     Run the agent container"
-    echo "  stop    Stop the running container"
-    echo "  logs    Show container logs"
-    echo "  shell   Open a shell in the running container"
+    echo "  build     Build the container image"
+    echo "  run       Run the agent container"
+    echo "  stop      Stop the running container"
+    echo "  rebuild   Stop, build, and run"
+    echo "  logs      Show container logs"
+    echo "  shell     Open a shell in the running container"
     echo ""
     echo "All variables in .env are required. See .env.example."
 }
@@ -73,6 +74,12 @@ stop() {
     echo "Container stopped."
 }
 
+rebuild() {
+    stop
+    build
+    run
+}
+
 logs() {
     podman logs -f "$CONTAINER_NAME"
 }
@@ -90,6 +97,9 @@ case "${1:-}" in
         ;;
     stop)
         stop
+        ;;
+    rebuild)
+        rebuild
         ;;
     logs)
         logs

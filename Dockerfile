@@ -18,20 +18,12 @@ RUN pip install --no-cache-dir uv
 # Create agent directory structure
 RUN mkdir -p /agent/main
 
-# Copy project files
-WORKDIR /app
-COPY pyproject.toml .
-COPY src/ ./src/
-COPY entrypoint.sh .
-
-# Install Python dependencies
-RUN uv pip install --system -e .
-
-# Make entrypoint executable
-RUN chmod +x entrypoint.sh
+# Copy minimal bootloader entrypoint only
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose status server port
 EXPOSE 8080
 
 # Set entrypoint
-CMD ["/app/entrypoint.sh"]
+CMD ["/entrypoint.sh"]

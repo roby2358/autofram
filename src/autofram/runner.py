@@ -24,7 +24,7 @@ class Runner:
 
     # Configuration
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-    WORK_INTERVAL_MINUTES = 10
+    WORK_INTERVAL_MINUTES = int(os.environ.get("WORK_INTERVAL_MINUTES", "1"))
     RETRY_DELAY_SECONDS = 60
     DISPLAY_TRUNCATE_LENGTH = 200
 
@@ -107,7 +107,7 @@ class Runner:
         return max(0, (next_time - datetime.now()).total_seconds())
 
     def sleep_until_next_interval(self) -> None:
-        """Sleep until the next 10-minute aligned interval."""
+        """Sleep until the next aligned interval (per WORK_INTERVAL_MINUTES)."""
         sleep_seconds = self.calculate_sleep_seconds()
         if sleep_seconds > 0:
             next_time = datetime.now() + timedelta(seconds=sleep_seconds)
