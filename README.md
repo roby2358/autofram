@@ -135,7 +135,7 @@ vim COMMS.md
 git add COMMS.md && git commit -m "Add directive" && git push
 ```
 
-4. The agent checks for updates every 10 minutes (aligned to :00, :10, :20, etc.)
+4. The agent checks for updates every `WORK_INTERVAL_MINUTES` minutes (aligned to clock boundaries)
 
 5. Pull to see agent responses:
 
@@ -171,3 +171,31 @@ All variables are required. See `.env.example` for reference.
 | GIT_USER_NAME | Git commit author name |
 | GIT_USER_EMAIL | Git commit author email |
 | AUTOFRAM_REMOTE | Path to bare git repo |
+| WORK_INTERVAL_MINUTES | Minutes between agent cycles (e.g., `10`) |
+
+## Resetting the Bare Repo
+
+If the bare repo gets out of sync or you want to start fresh:
+
+```bash
+# Stop the agent
+./launcher.sh stop
+
+# Delete and recreate the bare repo
+rm -rf ~/autofram-remote
+git init --bare -b main ~/autofram-remote
+
+# Push current code to it
+git push agent main
+
+# Rebuild and run
+./launcher.sh rebuild
+```
+
+If you also have a working copy, re-sync it:
+
+```bash
+cd ~/autofram-working
+git fetch origin
+git reset --hard origin/main
+```
