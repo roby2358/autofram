@@ -7,7 +7,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 from autofram.filesystem import FileSystem
 from autofram.git import Git
@@ -90,7 +90,7 @@ def read_file(path: str) -> str:
     Raises:
         FileNotFoundError: If the file does not exist
     """
-    file_path = FileSystem.resolve_path(path)
+    file_path = FileSystem.resolve_path(path, Path.cwd())
 
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {path}")
@@ -113,7 +113,7 @@ def write_file(path: str, content: str) -> str:
     Returns:
         Confirmation message with bytes written
     """
-    file_path = FileSystem.resolve_path(path)
+    file_path = FileSystem.resolve_path(path, Path.cwd())
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content)
     return f"Successfully wrote {len(content)} bytes to {path}"
@@ -202,7 +202,7 @@ def rollback() -> None:
 
 
 @mcp.tool()
-def web_search(query: str, max_results: int = 5) -> str:
+def web_search(query: str, max_results: int) -> str:
     """Search the web using DuckDuckGo.
 
     Use this to find documentation, research solutions, look up error messages,
@@ -211,7 +211,7 @@ def web_search(query: str, max_results: int = 5) -> str:
 
     Args:
         query: The search query (be specific for better results)
-        max_results: Maximum number of results to return (default 5)
+        max_results: Maximum number of results to return
 
     Returns:
         Formatted search results with titles, URLs, and snippets separated by ---

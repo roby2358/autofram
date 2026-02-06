@@ -9,7 +9,7 @@ dependencies = [
     "python-dotenv",
     "psutil",
     "pytest>=8.0",
-    "duckduckgo-search>=7.0",
+    "ddgs>=7.0",
     "fastapi",
     "uvicorn",
 ]

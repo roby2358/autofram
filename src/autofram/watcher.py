@@ -9,7 +9,7 @@ from pathlib import Path
 
 import psutil
 
-from autofram.filesystem import FileSystem
+from autofram.filesystem import LOCAL_FORMAT, FileSystem
 from autofram.git import Git
 
 
@@ -66,7 +66,7 @@ class Watcher:
     def log(self, message: str) -> None:
         """Log a message to watcher.log and stdout."""
         self.logs_dir.mkdir(exist_ok=True)
-        timestamp = FileSystem.format_local_timestamp()
+        timestamp = FileSystem.format_local_timestamp(LOCAL_FORMAT)
         log_line = f"[{timestamp}] {message}\n"
         print(log_line, end="")
         with open(self.watcher_log, "a") as f:
@@ -137,7 +137,7 @@ class Watcher:
         """Alert the PM by appending to COMMS.md and pushing."""
         self.log(f"ALERT: {message}")
         try:
-            timestamp = FileSystem.format_local_timestamp()
+            timestamp = FileSystem.format_local_timestamp(LOCAL_FORMAT)
             alert_text = f"\n\n---\n**WATCHER ALERT** ({timestamp}):\n{message}\n"
 
             content = self.comms_md.read_text() if self.comms_md.exists() else ""

@@ -11,6 +11,13 @@ import pytest
 from autofram.runner import Runner
 
 
+@pytest.fixture(autouse=True)
+def runner_env():
+    """Ensure WORK_INTERVAL_MINUTES is set for all runner tests."""
+    with patch.dict(os.environ, {"WORK_INTERVAL_MINUTES": "10"}):
+        yield
+
+
 class TestRunnerInit:
     """Tests for Runner initialization."""
 
@@ -45,7 +52,7 @@ class TestRunnerInit:
 
     def test_model_none_when_not_set(self):
         """Should have None model if not in environment."""
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"WORK_INTERVAL_MINUTES": "10"}, clear=True):
             runner = Runner()
             assert runner.model is None
 
@@ -111,7 +118,7 @@ class TestCalculateSleepSeconds:
         """Should return at most interval minutes in seconds."""
         runner = Runner()
         result = runner.calculate_sleep_seconds()
-        max_seconds = runner.WORK_INTERVAL_MINUTES * 60
+        max_seconds = runner.work_interval_minutes * 60
         assert result <= max_seconds
 
     @patch("autofram.runner.datetime")
@@ -217,7 +224,7 @@ class TestCreateClient:
 
     def test_exits_without_api_key(self):
         """Should exit if API key not set."""
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"WORK_INTERVAL_MINUTES": "10"}, clear=True):
             runner = Runner()
             runner.api_key = None
 

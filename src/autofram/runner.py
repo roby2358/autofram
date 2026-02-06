@@ -11,7 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from autofram.filesystem import FileSystem
+from autofram.filesystem import UTC_FORMAT, FileSystem
 from autofram.git import Git
 from autofram.tools import execute_tool, get_tools_for_openai
 
@@ -22,9 +22,7 @@ load_dotenv()
 class Runner:
     """Main LLM interaction loop for the autofram agent."""
 
-    # Configuration
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-    WORK_INTERVAL_MINUTES = int(os.environ.get("WORK_INTERVAL_MINUTES", "1"))
     RETRY_DELAY_SECONDS = 60
     DISPLAY_TRUNCATE_LENGTH = 200
 
@@ -35,6 +33,7 @@ class Runner:
             working_dir: Working directory (defaults to cwd)
         """
         self.working_dir = working_dir or Path.cwd()
+        self.work_interval_minutes = int(os.environ["WORK_INTERVAL_MINUTES"])
         self.system_md = self.working_dir / "static" / "prompts" / "SYSTEM.md"
         self.comms_md = self.working_dir / "COMMS.md"
         self.logs_dir = self.working_dir / "logs"
@@ -51,7 +50,7 @@ class Runner:
     def log_bootstrap(self, status: str) -> None:
         """Log a bootstrap event to bootstrap.log."""
         self.logs_dir.mkdir(exist_ok=True)
-        timestamp = FileSystem.format_timestamp()
+        timestamp = FileSystem.format_timestamp(UTC_FORMAT)
         branch = Git.get_current_branch(self.working_dir)
         with open(self.bootstrap_log, "a") as f:
             f.write(f"{status} {timestamp} {branch}\n")
@@ -66,17 +65,28 @@ class Runner:
         """Log a model API request or response to model.log.
 
         Args:
-            direction: Either "request" or "response"
-            data: The request or response data to log
+            direction: Either "request", "response", or "tool_result"
+            data: The request, response, or tool result data to log
         """
         self.logs_dir.mkdir(exist_ok=True)
         entry = {
-            "timestamp": FileSystem.format_timestamp(),
+            "timestamp": FileSystem.format_timestamp(UTC_FORMAT),
             "direction": direction,
             "data": data,
         }
         with open(self.model_log, "a") as f:
             f.write(json.dumps(entry) + "\n")
+
+    def log_error(self, error_msg: str) -> None:
+        """Log an error message to errors.log.
+
+        Args:
+            error_msg: The error message to log
+        """
+        self.logs_dir.mkdir(exist_ok=True)
+        timestamp = FileSystem.format_timestamp(UTC_FORMAT)
+        with open(self.errors_log, "a") as f:
+            f.write(f"[{timestamp}] {error_msg}\n")
 
     def load_file_content(self, path: Path, default: str) -> str:
         """Load file content or return default if not found."""
@@ -100,9 +110,9 @@ class Runner:
             Seconds to sleep (0 if already past target)
         """
         now = datetime.now()
-        minutes_to_next = self.WORK_INTERVAL_MINUTES - (now.minute % self.WORK_INTERVAL_MINUTES)
+        minutes_to_next = self.work_interval_minutes - (now.minute % self.work_interval_minutes)
         if minutes_to_next == 0:
-            minutes_to_next = self.WORK_INTERVAL_MINUTES
+            minutes_to_next = self.work_interval_minutes
         next_time = now.replace(second=0, microsecond=0) + timedelta(minutes=minutes_to_next)
         return max(0, (next_time - datetime.now()).total_seconds())
 
@@ -131,25 +141,28 @@ class Runner:
         """
         tool_name = tool_call.function.name
         tool_args = json.loads(tool_call.function.arguments)
-
         print(f"  Tool: {tool_name}({tool_args})")
 
         try:
-            result = execute_tool(tool_name, tool_args)
-            print(f"  Result: {self.truncate_for_display(result)}")
-            return {
-                "tool_call_id": tool_call.id,
-                "role": "tool",
-                "content": result,
-            }
+            content = execute_tool(tool_name, tool_args)
+            print(f"  Result: {self.truncate_for_display(content)}")
         except Exception as e:
-            error_msg = f"Error: {type(e).__name__}: {e}"
-            print(f"  {error_msg}", file=sys.stderr)
-            return {
-                "tool_call_id": tool_call.id,
-                "role": "tool",
-                "content": error_msg,
-            }
+            content = f"Error: {type(e).__name__}: {e}"
+            print(f"  {content}", file=sys.stderr)
+            self.log_error(f"Tool error in {tool_name}({tool_args}): {content}")
+
+        self.log_model("tool_result", {
+            "tool_name": tool_name,
+            "tool_args": tool_args,
+            "tool_call_id": tool_call.id,
+            "content": content,
+        })
+
+        return {
+            "tool_call_id": tool_call.id,
+            "role": "tool",
+            "content": content,
+        }
 
     def process_tool_calls(self, message, messages: list) -> None:
         """Process tool calls from an LLM message, handling nested calls.

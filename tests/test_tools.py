@@ -171,6 +171,7 @@ class TestGetToolsForOpenai:
         assert "bash" in tool_names
         assert "bootstrap" in tool_names
         assert "rollback" in tool_names
+        assert "web_search" in tool_names
 
     def test_tools_have_required_fields(self):
         """Each tool should have name, description, and parameters."""
@@ -231,6 +232,7 @@ class TestMcpToolManager:
         assert "bash" in registered_tools
         assert "bootstrap" in registered_tools
         assert "rollback" in registered_tools
+        assert "web_search" in registered_tools
 
     def test_tool_has_function(self):
         """Each registered tool should have a callable function."""
