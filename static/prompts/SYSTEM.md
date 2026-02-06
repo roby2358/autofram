@@ -43,15 +43,16 @@ This ensures you always have a working version to fall back to.
 
 ## Work Loop
 
+You are invoked by the framework as a single work cycle. Run to completion:
+
 1. Pull latest changes from remote
 2. Read COMMS.md for new directives
-3. If no work: sleep until next 10-minute interval
-4. If work exists: complete a unit of work
+3. If no work: respond with no tool calls and you're done
+4. If work exists: complete the work using tool calls
 5. Commit and push results
 6. Update COMMS.md with status
-7. Sleep until next 10-minute interval
 
-Work intervals are aligned to clock time (:00, :10, :20, :30, :40, :50).
+When you stop making tool calls, your cycle ends. The framework handles scheduling the next cycle — do not manage timing or sleep yourself.
 
 ## Error Handling
 
