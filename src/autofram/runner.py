@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Main LLM loop for the autofram agent."""
 
+import hashlib
 import json
 import os
 import sys
@@ -46,6 +47,7 @@ class Runner:
 
         self.client: OpenAI | None = None
         self.tools: list[dict] | None = None
+        self._last_comms_hash: str | None = None
 
     def log_bootstrap(self, status: str) -> None:
         """Log a bootstrap event to bootstrap.log."""
@@ -87,6 +89,16 @@ class Runner:
         timestamp = FileSystem.format_timestamp(UTC_FORMAT)
         with open(self.errors_log, "a") as f:
             f.write(f"[{timestamp}] {error_msg}\n")
+
+    def hash_comms(self) -> str | None:
+        """Hash the contents of COMMS.md, or None if missing."""
+        if not self.comms_md.exists():
+            return None
+        return hashlib.sha256(self.comms_md.read_bytes()).hexdigest()
+
+    def pull_latest(self) -> None:
+        """Pull latest changes from remote."""
+        Git.run(["pull", "--ff-only"], cwd=self.working_dir, check=False)
 
     def load_file_content(self, path: Path, default: str) -> str:
         """Load file content or return default if not found."""
@@ -219,6 +231,13 @@ class Runner:
 
     def run_single_iteration(self) -> None:
         """Run a single iteration of the LLM loop."""
+        self.pull_latest()
+
+        comms_hash = self.hash_comms()
+        if comms_hash == self._last_comms_hash:
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] COMMS.md unchanged, skipping cycle")
+            return
+
         system_prompt = self.load_system_prompt()
         messages = self.build_messages(system_prompt)
 
@@ -239,6 +258,8 @@ class Runner:
             self.process_tool_calls(message, messages)
         elif message.content:
             print(f"  Response: {message.content}")
+
+        self._last_comms_hash = self.hash_comms()
 
     def run(self) -> None:
         """Main LLM interaction loop."""

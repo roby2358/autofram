@@ -1,5 +1,6 @@
 """Tests for the Runner class."""
 
+import hashlib
 import json
 import os
 from datetime import datetime, timedelta
@@ -55,6 +56,150 @@ class TestRunnerInit:
         with patch.dict(os.environ, {"WORK_INTERVAL_MINUTES": "10"}, clear=True):
             runner = Runner()
             assert runner.model is None
+
+
+class TestHashComms:
+    """Tests for Runner.hash_comms."""
+
+    def test_returns_none_when_missing(self, tmp_path):
+        """Should return None when COMMS.md doesn't exist."""
+        runner = Runner(working_dir=tmp_path)
+        assert runner.hash_comms() is None
+
+    def test_returns_hash_when_exists(self, tmp_path):
+        """Should return SHA-256 hash of COMMS.md contents."""
+        (tmp_path / "COMMS.md").write_text("task list")
+        runner = Runner(working_dir=tmp_path)
+
+        result = runner.hash_comms()
+        expected = hashlib.sha256(b"task list").hexdigest()
+        assert result == expected
+
+    def test_different_content_different_hash(self, tmp_path):
+        """Should return different hash for different content."""
+        (tmp_path / "COMMS.md").write_text("version 1")
+        runner = Runner(working_dir=tmp_path)
+        hash_v1 = runner.hash_comms()
+
+        (tmp_path / "COMMS.md").write_text("version 2")
+        hash_v2 = runner.hash_comms()
+
+        assert hash_v1 != hash_v2
+
+    def test_same_content_same_hash(self, tmp_path):
+        """Should return identical hash for identical content."""
+        (tmp_path / "COMMS.md").write_text("stable")
+        runner = Runner(working_dir=tmp_path)
+
+        assert runner.hash_comms() == runner.hash_comms()
+
+
+class TestPullLatest:
+    """Tests for Runner.pull_latest."""
+
+    @patch("autofram.runner.Git.run")
+    def test_calls_git_pull(self, mock_git_run, tmp_path):
+        """Should call git pull --ff-only."""
+        runner = Runner(working_dir=tmp_path)
+        runner.pull_latest()
+
+        mock_git_run.assert_called_once_with(
+            ["pull", "--ff-only"], cwd=tmp_path, check=False
+        )
+
+
+class TestRunSingleIteration:
+    """Tests for Runner.run_single_iteration skip behavior."""
+
+    @patch("autofram.runner.Git.run")
+    def test_skips_when_comms_unchanged(self, mock_git_run, tmp_path):
+        """Should skip LLM call when COMMS.md hash matches."""
+        (tmp_path / "COMMS.md").write_text("no changes")
+        runner = Runner(working_dir=tmp_path)
+        runner._last_comms_hash = hashlib.sha256(b"no changes").hexdigest()
+        runner.client = MagicMock()
+
+        runner.run_single_iteration()
+
+        runner.client.chat.completions.create.assert_not_called()
+
+    @patch("autofram.runner.Git.run")
+    def test_runs_when_comms_changed(self, mock_git_run, tmp_path):
+        """Should call LLM when COMMS.md hash differs."""
+        prompts_dir = tmp_path / "static" / "prompts"
+        prompts_dir.mkdir(parents=True)
+        (prompts_dir / "SYSTEM.md").write_text("system")
+        (tmp_path / "COMMS.md").write_text("new task")
+        (tmp_path / "logs").mkdir()
+
+        runner = Runner(working_dir=tmp_path)
+        runner._last_comms_hash = "stale-hash"
+        runner.client = MagicMock()
+        runner.tools = []
+
+        mock_message = MagicMock()
+        mock_message.tool_calls = None
+        mock_message.content = "Done"
+        mock_message.model_dump.return_value = {"role": "assistant", "content": "Done"}
+        runner.client.chat.completions.create.return_value.choices = [
+            MagicMock(message=mock_message)
+        ]
+
+        runner.run_single_iteration()
+
+        runner.client.chat.completions.create.assert_called_once()
+
+    @patch("autofram.runner.Git.run")
+    def test_runs_on_first_iteration(self, mock_git_run, tmp_path):
+        """Should always run when _last_comms_hash is None."""
+        prompts_dir = tmp_path / "static" / "prompts"
+        prompts_dir.mkdir(parents=True)
+        (prompts_dir / "SYSTEM.md").write_text("system")
+        (tmp_path / "COMMS.md").write_text("task")
+        (tmp_path / "logs").mkdir()
+
+        runner = Runner(working_dir=tmp_path)
+        runner.client = MagicMock()
+        runner.tools = []
+
+        mock_message = MagicMock()
+        mock_message.tool_calls = None
+        mock_message.content = "Done"
+        mock_message.model_dump.return_value = {"role": "assistant", "content": "Done"}
+        runner.client.chat.completions.create.return_value.choices = [
+            MagicMock(message=mock_message)
+        ]
+
+        assert runner._last_comms_hash is None
+        runner.run_single_iteration()
+
+        runner.client.chat.completions.create.assert_called_once()
+
+    @patch("autofram.runner.Git.run")
+    def test_updates_hash_after_iteration(self, mock_git_run, tmp_path):
+        """Should update _last_comms_hash after a successful iteration."""
+        prompts_dir = tmp_path / "static" / "prompts"
+        prompts_dir.mkdir(parents=True)
+        (prompts_dir / "SYSTEM.md").write_text("system")
+        (tmp_path / "COMMS.md").write_text("task")
+        (tmp_path / "logs").mkdir()
+
+        runner = Runner(working_dir=tmp_path)
+        runner.client = MagicMock()
+        runner.tools = []
+
+        mock_message = MagicMock()
+        mock_message.tool_calls = None
+        mock_message.content = "Done"
+        mock_message.model_dump.return_value = {"role": "assistant", "content": "Done"}
+        runner.client.chat.completions.create.return_value.choices = [
+            MagicMock(message=mock_message)
+        ]
+
+        runner.run_single_iteration()
+
+        expected = hashlib.sha256(b"task").hexdigest()
+        assert runner._last_comms_hash == expected
 
 
 class TestLoadFileContent:
