@@ -13,6 +13,7 @@ from autofram.tools import (
     get_tools_for_openai,
     mcp,
     read_file,
+    touch_bootstrap,
     write_file,
 )
 
@@ -219,6 +220,31 @@ class TestExecuteTool:
             result = execute_tool("read_file", {"path": str(test_file)})
 
         assert isinstance(result, str)
+
+
+class TestTouchBootstrap:
+    """Tests for touch_bootstrap."""
+
+    @patch("autofram.tools.Git.get_branch_dir")
+    def test_creates_touch_file(self, mock_get_dir, tmp_path):
+        """Should create the bootstrapping touch file."""
+        mock_get_dir.return_value = tmp_path
+        logs_dir = tmp_path / "logs"
+
+        touch_bootstrap()
+
+        assert (logs_dir / "bootstrapping").exists()
+
+    @patch("autofram.tools.Git.get_branch_dir")
+    def test_creates_logs_directory(self, mock_get_dir, tmp_path):
+        """Should create logs directory if needed."""
+        mock_get_dir.return_value = tmp_path
+        logs_dir = tmp_path / "logs"
+        assert not logs_dir.exists()
+
+        touch_bootstrap()
+
+        assert logs_dir.exists()
 
 
 class TestMcpToolManager:

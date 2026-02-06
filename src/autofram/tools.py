@@ -18,6 +18,17 @@ mcp = FastMCP("autofram")
 BASH_TIMEOUT = 300  # 5 minutes
 
 
+def touch_bootstrap() -> None:
+    """Signal that a bootstrap is in progress.
+
+    Writes a touch file in main's logs directory so the watcher
+    knows not to panic during the transition.
+    """
+    touch_file = Git.get_branch_dir("main") / "logs" / "bootstrapping"
+    touch_file.parent.mkdir(exist_ok=True)
+    touch_file.touch()
+
+
 def exec_bootstrap(target_dir: Path) -> None:
     """Replace current process with bootstrap.sh from target directory.
 
@@ -176,6 +187,7 @@ def bootstrap(branch: str) -> None:
     Note:
         This function does not return - it replaces the current process.
     """
+    touch_bootstrap()
     target_dir = Git.get_branch_dir(branch)
     clone_or_update_branch(branch, target_dir)
     exec_bootstrap(target_dir)
@@ -196,6 +208,7 @@ def rollback() -> None:
     Note:
         This function does not return - it replaces the current process.
     """
+    touch_bootstrap()
     target_dir = Git.get_branch_dir("main")
     clone_or_update_branch("main", target_dir)
     exec_bootstrap(target_dir)

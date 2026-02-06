@@ -25,6 +25,7 @@ class Watcher:
     CRASH_WINDOW_SECONDS = 60 * 60  # 60 minutes
     POST_LAUNCH_DELAY = 10  # seconds to wait after launching runner
     POST_CRASH_LIMIT_DELAY = 300  # seconds to wait after hitting crash limit
+    BOOTSTRAP_GRACE_SECONDS = 60  # seconds to wait for bootstrap to complete
 
     def __init__(self, main_dir: Path | None = None):
         """Initialize the watcher.
@@ -168,9 +169,6 @@ class Watcher:
             self.log(f"ERROR: Runner not found at {runner_path}")
             return
 
-        if not Git.sync(self.main_dir, "main"):
-            self.log("Warning: git sync failed")
-
         self.logs_dir.mkdir(exist_ok=True)
 
         subprocess.Popen(
@@ -238,8 +236,20 @@ class Watcher:
         time.sleep(self.POST_LAUNCH_DELAY)
         return True
 
+    def is_bootstrap_in_progress(self) -> bool:
+        """Check if a bootstrap is in progress via touch file age."""
+        touch_file = self.logs_dir / "bootstrapping"
+        if not touch_file.exists():
+            return False
+        age = time.time() - touch_file.stat().st_mtime
+        return age < self.BOOTSTRAP_GRACE_SECONDS
+
     def handle_missing_runner(self) -> None:
         """Handle case when runner process is not found."""
+        if self.is_bootstrap_in_progress():
+            self.log("Bootstrap in progress, waiting...")
+            return
+
         self.log("Runner not found!")
 
         if not self.check_bootstrap_success():

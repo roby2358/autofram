@@ -1,5 +1,6 @@
 """Tests for the Watcher class."""
 
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -369,3 +370,80 @@ class TestCommitAndPushFile:
         result = watcher.commit_and_push_file(Path("test.txt"), "commit")
 
         assert result is False
+
+
+class TestIsBootstrapInProgress:
+    """Tests for Watcher.is_bootstrap_in_progress."""
+
+    def test_returns_false_when_no_touch_file(self, tmp_path):
+        """Should return False when touch file doesn't exist."""
+        watcher = Watcher(main_dir=tmp_path)
+        assert watcher.is_bootstrap_in_progress() is False
+
+    def test_returns_true_for_recent_touch_file(self, tmp_path):
+        """Should return True when touch file is fresh."""
+        watcher = Watcher(main_dir=tmp_path)
+        watcher.logs_dir.mkdir(parents=True)
+        (watcher.logs_dir / "bootstrapping").touch()
+
+        assert watcher.is_bootstrap_in_progress() is True
+
+    def test_returns_false_for_stale_touch_file(self, tmp_path):
+        """Should return False when touch file is older than grace period."""
+        watcher = Watcher(main_dir=tmp_path)
+        watcher.logs_dir.mkdir(parents=True)
+        touch_file = watcher.logs_dir / "bootstrapping"
+        touch_file.touch()
+
+        # Backdate the file past the grace period
+        stale_time = time.time() - watcher.BOOTSTRAP_GRACE_SECONDS - 10
+        import os
+        os.utime(touch_file, (stale_time, stale_time))
+
+        assert watcher.is_bootstrap_in_progress() is False
+
+
+class TestHandleMissingRunnerWithBootstrap:
+    """Tests for handle_missing_runner bootstrap grace period."""
+
+    @patch("autofram.watcher.FileSystem.format_local_timestamp", return_value="2024-01-15 10:00:00")
+    def test_skips_when_bootstrap_in_progress(self, mock_timestamp, tmp_path):
+        """Should not launch runner when bootstrap is in progress."""
+        watcher = Watcher(main_dir=tmp_path)
+        watcher.logs_dir.mkdir(parents=True)
+        (watcher.logs_dir / "bootstrapping").touch()
+
+        watcher.handle_missing_runner()
+
+        # Should not have recorded a crash
+        assert len(watcher.crash_times) == 0
+
+    @patch("autofram.watcher.FileSystem.format_local_timestamp", return_value="2024-01-15 10:00:00")
+    def test_proceeds_when_no_bootstrap(self, mock_timestamp, tmp_path):
+        """Should proceed with crash handling when no bootstrap in progress."""
+        watcher = Watcher(main_dir=tmp_path)
+        watcher.logs_dir.mkdir(parents=True)
+        watcher.bootstrap_log.write_text("BOOTSTRAPPING\nSUCCESS\n")
+
+        with patch.object(watcher, "handle_crash_and_restart") as mock_restart:
+            watcher.handle_missing_runner()
+            mock_restart.assert_called_once()
+
+
+class TestLaunchRunnerNoSync:
+    """Tests for launch_runner without Git.sync."""
+
+    @patch("autofram.watcher.Git.sync")
+    @patch("subprocess.Popen")
+    @patch("autofram.watcher.FileSystem.format_local_timestamp", return_value="2024-01-15 10:00:00")
+    def test_does_not_call_git_sync(self, mock_timestamp, mock_popen, mock_sync, tmp_path):
+        """Should not call Git.sync when launching runner."""
+        watcher = Watcher(main_dir=tmp_path)
+        runner_path = tmp_path / "src" / "autofram" / "runner.py"
+        runner_path.parent.mkdir(parents=True)
+        runner_path.write_text("# runner")
+
+        watcher.launch_runner()
+
+        mock_sync.assert_not_called()
+        mock_popen.assert_called_once()
