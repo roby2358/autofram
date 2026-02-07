@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """FastAPI status server for the autofram agent."""
 
+import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 import psutil
 from fastapi import FastAPI
@@ -83,9 +85,22 @@ def status() -> str:
     return "\n".join(lines)
 
 
+def setup_access_log(log_path: Path) -> None:
+    """Configure uvicorn access logging to a file."""
+    log_path.parent.mkdir(exist_ok=True)
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.addHandler(handler)
+    access_logger.setLevel(logging.INFO)
+
+
 def main() -> None:
     """Start the server."""
     import uvicorn
+
+    logs_dir = Path.cwd() / "logs"
+    setup_access_log(logs_dir / "access.log")
 
     port = int(os.environ.get("AUTOFRAM_STATUS_PORT", "8080"))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")

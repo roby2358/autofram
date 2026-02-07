@@ -1,7 +1,9 @@
 """Tests for the status server."""
 
+import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -109,3 +111,47 @@ class TestStatusEndpoint:
 
         assert "watcher: pid=111" in result
         assert "runner: pid=222" in result
+
+
+class TestSetupAccessLog:
+    """Tests for setup_access_log."""
+
+    def test_creates_log_directory(self, tmp_path):
+        """Should create parent directory for the log file."""
+        log_path = tmp_path / "logs" / "access.log"
+        assert not log_path.parent.exists()
+
+        server.setup_access_log(log_path)
+
+        assert log_path.parent.exists()
+
+    def test_adds_file_handler_to_uvicorn_access_logger(self, tmp_path):
+        """Should add a FileHandler to the uvicorn.access logger."""
+        log_path = tmp_path / "logs" / "access.log"
+        access_logger = logging.getLogger("uvicorn.access")
+        initial_handlers = len(access_logger.handlers)
+
+        server.setup_access_log(log_path)
+
+        assert len(access_logger.handlers) == initial_handlers + 1
+        added_handler = access_logger.handlers[-1]
+        assert isinstance(added_handler, logging.FileHandler)
+
+        # Cleanup
+        access_logger.removeHandler(added_handler)
+        added_handler.close()
+
+    def test_sets_info_level(self, tmp_path):
+        """Should set uvicorn.access logger to INFO level."""
+        log_path = tmp_path / "logs" / "access.log"
+
+        server.setup_access_log(log_path)
+
+        access_logger = logging.getLogger("uvicorn.access")
+        assert access_logger.level == logging.INFO
+
+        # Cleanup
+        for h in access_logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                access_logger.removeHandler(h)
+                h.close()
