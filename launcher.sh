@@ -56,6 +56,7 @@ run() {
         --cap-drop=ALL \
         --cap-add=NET_ADMIN \
         --security-opt=no-new-privileges \
+        --network pasta \
         -v "$REMOTE_REPO:/mnt/remote:z" \
         -p 8080:8080 \
         -e "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
