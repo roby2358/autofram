@@ -119,8 +119,9 @@ cat /agent/main/autofram/logs/watcher.log
 1. Clone the working copy (one-time setup):
 
 ```bash
-git clone ~/autofram-remote ~/autofram-working
-cd ~/autofram-working
+cd <projects directory>
+git clone ~/autofram-remote autofram-working
+cd autofram-working
 ```
 
 2. Edit `COMMS.md` with your directives:
@@ -184,6 +185,7 @@ If the bare repo gets out of sync or you want to start fresh:
 # Delete and recreate the bare repo
 rm -rf ~/autofram-remote
 git init --bare -b main ~/autofram-remote
+git remote add agent ~/autofram-remote
 
 # Push current code to it
 git push agent main
@@ -192,10 +194,18 @@ git push agent main
 ./launcher.sh rebuild
 ```
 
-If you also have a working copy, re-sync it:
+## To set up a working copy
 
 ```bash
-cd ~/autofram-working
+cd <projects directory>
+git clone ~/autofram-remote autofram-working
+cd autofram-working
+```
+
+## To re-sync a working copy
+
+```bash
+cd <projects directory>/autofram-working
 git fetch origin
 git reset --hard origin/main
 ```
