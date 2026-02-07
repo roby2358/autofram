@@ -12,6 +12,7 @@ dependencies = [
     "ddgs>=7.0",
     "fastapi",
     "uvicorn",
+    "claude-code-sdk",
 ]
 
 [build-system]

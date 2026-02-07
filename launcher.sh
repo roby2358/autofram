@@ -11,7 +11,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Check for required environment variables
-REQUIRED_VARS="OPENROUTER_API_KEY OPENROUTER_MODEL GIT_USER_NAME GIT_USER_EMAIL AUTOFRAM_REMOTE WORK_INTERVAL_MINUTES"
+REQUIRED_VARS="OPENROUTER_API_KEY OPENROUTER_MODEL GIT_USER_NAME GIT_USER_EMAIL AUTOFRAM_REMOTE WORK_INTERVAL_MINUTES CLAUDE_CODE_OAUTH_TOKEN"
 for var in $REQUIRED_VARS; do
     if [ -z "${!var}" ]; then
         echo "Error: $var is not set"
@@ -64,6 +64,7 @@ run() {
         -e "GIT_USER_NAME=$GIT_USER_NAME" \
         -e "GIT_USER_EMAIL=$GIT_USER_EMAIL" \
         -e "WORK_INTERVAL_MINUTES=$WORK_INTERVAL_MINUTES" \
+        -e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN" \
         "$IMAGE_NAME"
 
     echo "Container started. View logs with: $0 logs"

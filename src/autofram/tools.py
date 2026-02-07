@@ -1,5 +1,7 @@
 """MCP tool definitions for the autofram agent."""
 
+import asyncio
+import inspect
 import os
 import subprocess
 import sys
@@ -9,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ddgs import DDGS
 
+from autofram.contracts import execute_contracts as _execute_contracts
 from autofram.filesystem import FileSystem
 from autofram.git import Git
 
@@ -215,6 +218,23 @@ def rollback() -> None:
 
 
 @mcp.tool()
+async def execute_contracts() -> str:
+    """Execute all pending contracts in the contracts/ directory.
+
+    Scans contracts/ for markdown files with Status: pending, runs each one
+    sequentially via the Claude Agent SDK, and returns a summary of outcomes.
+
+    Use this after creating contract files in contracts/. Each contract is
+    executed by a separate Claude agent that does the actual work. The agent
+    only modifies files — git operations are your responsibility.
+
+    Returns:
+        Summary of contract execution results
+    """
+    return await _execute_contracts()
+
+
+@mcp.tool()
 def web_search(query: str, max_results: int) -> str:
     """Search the web using DuckDuckGo.
 
@@ -278,6 +298,9 @@ def execute_tool(name: str, arguments: dict) -> str:
         raise ValueError(f"Unknown tool: {name}")
 
     result = tool.fn(**arguments)
+
+    if inspect.iscoroutine(result):
+        result = asyncio.run(result)
 
     # bootstrap and rollback don't return (they exec)
     if result is None:

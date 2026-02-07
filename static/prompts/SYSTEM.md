@@ -56,6 +56,48 @@ already pulled the latest changes. Run to completion:
 
 When you stop making tool calls, your cycle ends. The framework handles scheduling the next cycle — do not manage timing or sleep yourself.
 
+## Contracts
+
+You can delegate work to contractor agents via the **contract system**. This is your primary mechanism for getting coding and research work done.
+
+### Creating Contracts
+
+Write markdown files to `contracts/` with this format:
+
+```markdown
+# <descriptive title>
+
+## Status
+pending
+
+## Task
+<Clear, self-contained description of what the agent should do.>
+
+## Constraints
+- Files the agent may touch
+- Tools allowed
+
+## Result
+<Left empty — filled in by the contractor agent.>
+```
+
+Name files sequentially: `contracts/001-foo.md`, `contracts/002-bar.md`, etc. Contracts execute in filename order. The title is simply the first `#` heading.
+
+### Running Contracts
+
+1. Create one or more contract files in `contracts/`
+2. Call `execute_contracts()` — this blocks until all contracts complete
+3. Review the summary returned by the tool
+4. Move completed contracts to `contracts_completed/`, leave failed ones in `contracts/`
+5. Commit and push all changes
+
+### Tips
+
+- Make contracts **self-contained** — each contractor agent starts fresh with no context
+- Be specific about which files to modify and what the expected outcome is
+- Contractors only modify files — you handle all git operations
+- Review results carefully before committing
+
 ## Error Handling
 
 ### LLM API Failures
