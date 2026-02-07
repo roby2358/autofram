@@ -3,10 +3,12 @@
 
 import hashlib
 import json
+import logging
 import os
 import sys
 import time
 from datetime import datetime, timedelta
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -20,12 +22,17 @@ from autofram.tools import execute_tool, get_tools_for_openai
 load_dotenv()
 
 
+logger = logging.getLogger("autofram.runner")
+
+
 class Runner:
     """Main LLM interaction loop for the autofram agent."""
 
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
     RETRY_DELAY_SECONDS = 60
     DISPLAY_TRUNCATE_LENGTH = 200
+    LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+    LOG_BACKUP_COUNT = 3
 
     def __init__(self, working_dir: Path | None = None):
         """Initialize the runner.
@@ -62,6 +69,24 @@ class Runner:
         self.logs_dir.mkdir(exist_ok=True)
         self.errors_log.write_text("")
         sys.stderr = open(self.errors_log, "a")
+
+    def setup_logging(self) -> None:
+        """Configure runner logger with console and rotating file handlers."""
+        self.logs_dir.mkdir(exist_ok=True)
+
+        logger.setLevel(logging.INFO)
+
+        console = logging.StreamHandler(sys.__stdout__)
+        console.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(console)
+
+        file_handler = RotatingFileHandler(
+            self.logs_dir / "runner.log",
+            maxBytes=self.LOG_MAX_BYTES,
+            backupCount=self.LOG_BACKUP_COUNT,
+        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(file_handler)
 
     def log_model(self, direction: str, data: dict) -> None:
         """Log a model API request or response to model.log.
@@ -133,7 +158,7 @@ class Runner:
         sleep_seconds = self.calculate_sleep_seconds()
         if sleep_seconds > 0:
             next_time = datetime.now() + timedelta(seconds=sleep_seconds)
-            print(f"Sleeping until {next_time.strftime('%H:%M')} ({sleep_seconds:.0f}s)")
+            logger.info("Sleeping until %s (%ds)", next_time.strftime("%H:%M"), sleep_seconds)
             time.sleep(sleep_seconds)
 
     def truncate_for_display(self, text: str) -> str:
@@ -153,14 +178,14 @@ class Runner:
         """
         tool_name = tool_call.function.name
         tool_args = json.loads(tool_call.function.arguments)
-        print(f"  Tool: {tool_name}({tool_args})")
+        logger.info("Tool: %s(%s)", tool_name, tool_args)
 
         try:
             content = execute_tool(tool_name, tool_args)
-            print(f"  Result: {self.truncate_for_display(content)}")
+            logger.info("Result: %s", self.truncate_for_display(content))
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
-            print(f"  {content}", file=sys.stderr)
+            logger.error("Tool error in %s(%s): %s", tool_name, tool_args, content)
             self.log_error(f"Tool error in {tool_name}({tool_args}): {content}")
 
         self.log_model("tool_result", {
@@ -204,7 +229,7 @@ class Runner:
 
             if not follow_up.tool_calls:
                 if follow_up.content:
-                    print(f"  Response: {follow_up.content}")
+                    logger.info("Response: %s", follow_up.content)
                 break
 
             nested_results = [self.execute_tool_call(tc) for tc in follow_up.tool_calls]
@@ -221,7 +246,7 @@ class Runner:
     def create_client(self) -> OpenAI:
         """Create and return the OpenAI client configured for OpenRouter."""
         if not self.api_key:
-            print("ERROR: OPENROUTER_API_KEY not set", file=sys.stderr)
+            logger.error("OPENROUTER_API_KEY not set")
             sys.exit(1)
 
         return OpenAI(
@@ -235,13 +260,13 @@ class Runner:
 
         comms_hash = self.hash_comms()
         if comms_hash == self._last_comms_hash:
-            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] COMMS.md unchanged, skipping cycle")
+            logger.info("COMMS.md unchanged, skipping cycle")
             return
 
         system_prompt = self.load_system_prompt()
         messages = self.build_messages(system_prompt)
 
-        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Calling LLM...")
+        logger.info("Calling LLM...")
         self.log_model("request", {"messages": messages, "tools": self.tools})
 
         response = self.client.chat.completions.create(
@@ -257,7 +282,7 @@ class Runner:
         if message.tool_calls:
             self.process_tool_calls(message, messages)
         elif message.content:
-            print(f"  Response: {message.content}")
+            logger.info("Response: %s", message.content)
 
         self._last_comms_hash = self.hash_comms()
 
@@ -272,23 +297,23 @@ class Runner:
                 self.sleep_until_next_interval()
 
             except KeyboardInterrupt:
-                print("\nShutdown requested.")
+                logger.info("Shutdown requested.")
                 break
             except Exception as e:
-                print(f"ERROR in LLM loop: {type(e).__name__}: {e}", file=sys.stderr)
+                logger.error("LLM loop error: %s: %s", type(e).__name__, e)
                 time.sleep(self.RETRY_DELAY_SECONDS)
 
     def start(self) -> None:
         """Main entry point."""
-        print(f"Autofram Runner starting in {self.working_dir}")
-        print(f"Branch: {Git.get_current_branch(self.working_dir)}")
-        print(f"Model: {self.model}")
-
         self.log_bootstrap("BOOTSTRAPPING")
         self.setup_error_logging()
+        self.setup_logging()
         self.log_bootstrap("SUCCESS")
 
-        print("Bootstrap successful, entering main loop...")
+        logger.info("Autofram Runner starting in %s", self.working_dir)
+        logger.info("Branch: %s", Git.get_current_branch(self.working_dir))
+        logger.info("Model: %s", self.model)
+        logger.info("Bootstrap successful, entering main loop...")
         self.run()
 
 

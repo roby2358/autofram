@@ -2,14 +2,16 @@
 
 import hashlib
 import json
+import logging
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from autofram.runner import Runner
+from autofram.runner import Runner, logger as runner_logger
 
 
 @pytest.fixture(autouse=True)
@@ -417,6 +419,63 @@ class TestExecuteToolCall:
 
         assert "Error:" in result["content"]
         assert "FileNotFoundError" in result["content"]
+
+
+class TestSetupLogging:
+    """Tests for Runner.setup_logging."""
+
+    def _cleanup_logger(self):
+        """Remove all handlers from the runner logger."""
+        for h in runner_logger.handlers[:]:
+            runner_logger.removeHandler(h)
+            h.close()
+
+    def test_creates_logs_directory(self, tmp_path):
+        """Should create logs directory."""
+        runner = Runner(working_dir=tmp_path)
+        assert not runner.logs_dir.exists()
+
+        runner.setup_logging()
+
+        assert runner.logs_dir.exists()
+        self._cleanup_logger()
+
+    def test_adds_console_and_file_handlers(self, tmp_path):
+        """Should add both a StreamHandler and a RotatingFileHandler."""
+        self._cleanup_logger()
+        runner = Runner(working_dir=tmp_path)
+
+        runner.setup_logging()
+
+        handler_types = [type(h) for h in runner_logger.handlers]
+        assert logging.StreamHandler in handler_types
+        from logging.handlers import RotatingFileHandler
+        assert RotatingFileHandler in handler_types
+        self._cleanup_logger()
+
+    def test_logger_writes_to_file(self, tmp_path):
+        """Should write log messages to runner.log."""
+        self._cleanup_logger()
+        runner = Runner(working_dir=tmp_path)
+
+        runner.setup_logging()
+        runner_logger.info("test log message")
+
+        for h in runner_logger.handlers:
+            h.flush()
+
+        log_content = (runner.logs_dir / "runner.log").read_text()
+        assert "test log message" in log_content
+        self._cleanup_logger()
+
+    def test_sets_info_level(self, tmp_path):
+        """Should set logger to INFO level."""
+        runner = Runner(working_dir=tmp_path)
+
+        runner.setup_logging()
+
+        assert runner_logger.level == logging.INFO
+        self._cleanup_logger()
 
 
 class TestLogBootstrap:
