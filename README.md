@@ -184,6 +184,7 @@ If the bare repo gets out of sync or you want to start fresh:
 
 # Delete and recreate the bare repo
 rm -rf ~/autofram-remote
+rm -rf ../autofram-working
 git init --bare -b main ~/autofram-remote
 git remote add agent ~/autofram-remote
 
@@ -197,7 +198,7 @@ git push agent main
 ## To set up a working copy
 
 ```bash
-cd <projects directory>
+cd ..
 git clone ~/autofram-remote autofram-working
 cd autofram-working
 ```
@@ -205,7 +206,6 @@ cd autofram-working
 ## To re-sync a working copy
 
 ```bash
-cd <projects directory>/autofram-working
 git fetch origin
 git reset --hard origin/main
 ```
