@@ -72,6 +72,9 @@ This system provides a secure environment for an AI agent to write, test, and de
 └── /logs                  # .gitignored
     ├── bootstrap.log      # Bootstrap attempts and outcomes
     ├── errors.log         # Captured errors and stderr
+    ├── runner.log         # Runner operational log (rotating)
+    ├── model.log          # LLM API requests and responses (JSONL)
+    ├── access.log         # Status server access log
     └── watcher.log        # Watcher operational log
 ```
 
@@ -79,11 +82,12 @@ This system provides a secure environment for an AI agent to write, test, and de
 
 ### Container Isolation
 
+- The container MUST allow DNS traffic (UDP/TCP port 53) before applying private range blocks (required for environments where the DNS resolver is on a private IP, e.g., WSL)
 - The container MUST block all network access to RFC1918 private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
 - The container MUST block access to link-local addresses (169.254.0.0/16)
 - The container MUST allow outbound internet access for LLM API calls and package installation
 - The container MUST mount the host's bare git repo at /mnt/remote
-- The container MUST drop all capabilities except those required for operation
+- The container MUST drop all capabilities and add back only NET_ADMIN (required for nftables)
 - The container MUST run with no-new-privileges security option
 
 ### Git Communication
@@ -101,13 +105,14 @@ The agent MUST have access to the following tools:
 
 - **read_file(path)** - Read contents of a file
 - **write_file(path, content)** - Write contents to a file
-- **bash(command)** - Execute a shell command
+- **bash(command)** - Execute a shell command (5-minute timeout)
 - **bootstrap(branch)** - Clone/update target branch directory and exec its runner
-- **rollback(ref)** - Reset current branch to specified git ref and exec runner
+- **rollback()** - Bootstrap to main branch to recover from a bad state
+- **web_search(query, max_results)** - Search the web using DuckDuckGo
 
 The agent SHOULD use bash for git operations, running tests, and other system tasks.
 
-Bootstrap and rollback tools directly exec the new runner process, replacing the current process. There is brief overlap during the transition. The watcher is not involved in bootstrap/rollback - it only handles crash recovery.
+Bootstrap and rollback tools directly exec the new runner process, replacing the current process. Before exec, the tool MUST write a touch file (`logs/bootstrapping`) in main's logs directory so the watcher knows a transition is in progress. The watcher is not involved in bootstrap/rollback - it only handles crash recovery.
 
 ### Prompt Construction
 
@@ -120,7 +125,7 @@ Bootstrap and rollback tools directly exec the new runner process, replacing the
 
 SYSTEM.md MUST establish:
 - The agent's identity and purpose (self-modifying autonomous agent)
-- Available tools and their usage (read_file, write_file, bash, bootstrap, rollback)
+- Available tools and their usage (read_file, write_file, bash, bootstrap, rollback, web_search)
 - The hop-scotch upgrade pattern and when to use it
 - Communication protocol via COMMS.md
 - Work loop behavior and timing
@@ -152,21 +157,33 @@ SYSTEM.md MUST establish:
 
 ### Hop-Scotch Upgrade Pattern
 
-- The agent MUST modify code on a branch different from the one it is running on
-- To upgrade, the running agent MUST:
-    - Commit changes to the target branch
-    - Push to remote
-    - Call bootstrap(target_branch) which execs the new runner
-- The newly launched branch MUST:
-    - Self-validate
-    - Merge into main (if stable)
-    - Call bootstrap("main") which execs the main runner
-- Bootstrap uses exec to replace the current process with the new runner
-- Brief overlap occurs during exec transition; this is acceptable
+The agent MUST NOT modify files in its own running directory. All code changes MUST be made in a separate clone directory and validated there before merging.
+
+**Step 1: Running from main path** (`/agent/main/autofram/`)
+- The agent creates a git branch and pushes it to remote
+- The agent clones the branch to a separate directory (`/agent/feature-x/autofram/`)
+- The agent makes and tests changes in the clone directory
+- The agent commits and pushes from the clone directory
+
+**Step 2: Bootstrap into branch path** (`/agent/feature-x/autofram/`)
+- The agent calls `bootstrap("feature-x")` which execs the branch's runner
+- The current process is replaced; the agent is now running from the branch path
+
+**Step 3: Validate in branch path**
+- The agent self-validates (runs tests, checks behavior)
+- If unstable, the agent calls `rollback()` to return to main, or the watcher recovers automatically on crash
+
+**Step 4: Bootstrap back to main path** (`/agent/main/autofram/`)
+- The agent merges the branch into main and pushes
+- The agent calls `bootstrap("main")` which execs the main runner
+- The agent is now running from main with the upgraded code
+
+Bootstrap uses exec to replace the current process with the target branch's runner. The main path (`/agent/main/autofram/`) MUST remain untouched during the upgrade so the watcher can fall back to it on failure.
 
 ### Work Loop
 
 - The agent MUST check COMMS.md for new directives at the configured interval (WORK_INTERVAL_MINUTES)
+- The agent MUST skip the LLM call if COMMS.md has not changed since the last cycle (tracked via content hash)
 - Work intervals MUST be aligned to clock time (e.g., with 1-minute interval: :00, :01, :02, ...)
 - After completing work, the agent MUST sleep until the next aligned interval
 - If work extends past an interval boundary, the agent MUST continue working and wait for the next interval
@@ -181,7 +198,8 @@ The watcher handles crash recovery only. Bootstrap and rollback are handled by t
 - The watcher MUST find the runner by scanning for the process by name
 - The watcher MUST monitor the runner process for unexpected termination
 - If the runner crashes, the watcher MUST launch runner from /agent/main/autofram
-- The watcher MUST monitor for CPU runaway (100% CPU for 60+ seconds)
+- The watcher MUST recognize an in-progress bootstrap via a touch file (`logs/bootstrapping`) and suppress restart during the grace period (60 seconds)
+- The watcher MUST monitor for CPU runaway (95%+ CPU for 60+ seconds)
 - The watcher MUST monitor for log file explosion (errors.log exceeds 1 MB)
 - The watcher MUST terminate the agent if runaway or explosion is detected
 - The watcher MUST track crash frequency and implement restart limits
@@ -232,10 +250,13 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 ### Logging
 
 - The logs/ directory MUST be located within the working directory (/agent/<branch>/autofram/logs/)
-- The runner MUST capture its stdout and stderr to logs/errors.log
+- The runner MUST capture its stderr to logs/errors.log
+- The runner MUST maintain a rotating operational log (logs/runner.log, 5 MB max, 3 backups)
+- The runner MUST log all LLM API requests and responses to logs/model.log in JSONL format
 - The agent MUST be able to read errors.log to investigate failures
 - Bootstrap attempts MUST be logged to logs/bootstrap.log
 - The watcher MUST maintain its own operational log (logs/watcher.log)
+- The status server MUST log HTTP access to logs/access.log
 - Log files MUST NOT be committed to git (logs/ in .gitignore)
 - Each bootstrap SHOULD start with a fresh errors.log (truncate on startup)
 - Old logs are cleaned up when branch directories are deleted after merge
@@ -261,7 +282,7 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 
 - The system MUST recover from agent crashes by falling back to main
 - The system MUST maintain git history for all changes
-- The system SHOULD support rollback to any previous git ref
+- The system MUST support rollback to main as a recovery mechanism
 - The watcher MUST continue running even if agent repeatedly crashes
 
 ### Observability
@@ -286,9 +307,11 @@ Valid status values: BOOTSTRAPPING, SUCCESS, FALLBACK
 
 **Agent Runtime:**
 - Python for watcher and runner infrastructure
-- LLM API via OpenRouter (default model: Claude Sonnet 4.5)
-- MCP (Model Context Protocol) for tool exposure
+- LLM API via OpenRouter using the OpenAI Python client (default model: Claude Sonnet 4.5)
+- FastMCP for tool schema generation (OpenAI function calling format)
 - FastAPI and uvicorn for status server
+- DuckDuckGo Search (ddgs) for web search tool
+- psutil for process monitoring
 - Third-party OSS libraries preferred over custom implementations
 
 **Available Services:**
@@ -374,7 +397,7 @@ The watcher is designed to be minimal. It only monitors for crashes and resource
 
 ### MCP Tool Exposure
 
-Tools are exposed to the LLM via Model Context Protocol (MCP). This provides a standardized interface for tool discovery and execution. The runner acts as an MCP server, exposing read_file, write_file, bash, bootstrap, and rollback tools to the model.
+Tools are defined using MCP's FastMCP decorator for schema generation, but invoked directly as Python functions via the OpenAI function calling format. The runner extracts tool schemas from FastMCP and converts them to OpenAI tool definitions. Tool execution is synchronous within the LLM conversation loop.
 
 ### Context Window Management
 
@@ -392,7 +415,7 @@ The system MUST handle these error conditions:
 - **Agent crash during work** - Watcher restarts from main, agent investigates via error logs
 - **Bad bootstrap target** - Runner fails to exec, crashes, watcher falls back to main
 - **Git push failure** - Agent retries or reports in COMMS.md
-- **LLM API failure** - Agent logs error, sleeps, retries on next interval
+- **LLM API failure** - Agent logs error, sleeps 60 seconds, retries
 - **Runaway process** - Watcher terminates agent, restarts from main
 - **Log explosion** - Watcher terminates agent, restarts from main
 - **Repeated crashes** - After 5 crashes in 60 minutes, watcher stops and alerts PM via COMMS.md
