@@ -178,6 +178,11 @@ class Runner:
         try:
             content = execute_tool(tool_name, tool_args)
             logger.info("Result: %s", truncate_for_display(content))
+        except IsADirectoryError:
+            path = tool_args.get('path', '')
+            content = f"Error: '{path}' is a directory, not a file. Use bash('ls {path}') to list its contents."
+            args_short = truncate_for_display(str(tool_args))
+            logger.info("Tool: %s(%s) — is a directory", tool_name, args_short)
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
             args_short = truncate_for_display(str(tool_args))
