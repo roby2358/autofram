@@ -295,7 +295,7 @@ def execute_tool(name: str, arguments: dict) -> str:
     """
     tool = mcp._tool_manager._tools.get(name)
     if tool is None:
-        raise ValueError(f"Unknown tool: {name}")
+        raise ValueError(f"Tool '{name}' does not exist. Check available tools and try again.")
 
     result = tool.fn(**arguments)
 
