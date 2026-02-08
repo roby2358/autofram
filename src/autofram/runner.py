@@ -16,6 +16,7 @@ from openai import OpenAI
 
 from autofram.filesystem import UTC_FORMAT, FileSystem
 from autofram.git import Git
+from autofram.logger_out import truncate_for_display
 from autofram.tools import execute_tool, get_tools_for_openai
 
 # Load environment variables
@@ -30,7 +31,6 @@ class Runner:
 
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
     RETRY_DELAY_SECONDS = 60
-    DISPLAY_TRUNCATE_LENGTH = 200
     LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
     LOG_BACKUP_COUNT = 3
 
@@ -75,6 +75,7 @@ class Runner:
         self.logs_dir.mkdir(exist_ok=True)
 
         logger.setLevel(logging.INFO)
+        logger.propagate = False
 
         console = logging.StreamHandler(sys.__stdout__)
         console.setFormatter(logging.Formatter("%(message)s"))
@@ -161,12 +162,6 @@ class Runner:
             logger.info("Sleeping until %s (%ds)", next_time.strftime("%H:%M"), sleep_seconds)
             time.sleep(sleep_seconds)
 
-    def truncate_for_display(self, text: str) -> str:
-        """Truncate text for display with ellipsis."""
-        if len(text) > self.DISPLAY_TRUNCATE_LENGTH:
-            return f"{text[:self.DISPLAY_TRUNCATE_LENGTH]}..."
-        return text
-
     def execute_tool_call(self, tool_call) -> dict:
         """Execute a single tool call and return the result message.
 
@@ -182,7 +177,7 @@ class Runner:
 
         try:
             content = execute_tool(tool_name, tool_args)
-            logger.info("Result: %s", self.truncate_for_display(content))
+            logger.info("Result: %s", truncate_for_display(content))
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
             logger.error("Tool error in %s(%s): %s", tool_name, tool_args, content)
@@ -229,7 +224,7 @@ class Runner:
 
             if not follow_up.tool_calls:
                 if follow_up.content:
-                    logger.info("Response: %s", follow_up.content)
+                    logger.info("Response: %s", truncate_for_display(follow_up.content))
                 break
 
             nested_results = [self.execute_tool_call(tc) for tc in follow_up.tool_calls]
@@ -282,7 +277,7 @@ class Runner:
         if message.tool_calls:
             self.process_tool_calls(message, messages)
         elif message.content:
-            logger.info("Response: %s", message.content)
+            logger.info("Response: %s", truncate_for_display(message.content))
 
         self._last_comms_hash = self.hash_comms()
 
