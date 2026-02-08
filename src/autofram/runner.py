@@ -173,15 +173,16 @@ class Runner:
         """
         tool_name = tool_call.function.name
         tool_args = json.loads(tool_call.function.arguments)
-        logger.info("Tool: %s(%s)", tool_name, tool_args)
+        logger.info("Tool: %s(%s)", tool_name, truncate_for_display(str(tool_args)))
 
         try:
             content = execute_tool(tool_name, tool_args)
             logger.info("Result: %s", truncate_for_display(content))
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
-            logger.error("Tool error in %s(%s): %s", tool_name, tool_args, content)
-            self.log_error(f"Tool error in {tool_name}({tool_args}): {content}")
+            args_short = truncate_for_display(str(tool_args))
+            logger.error("Tool error in %s(%s): %s", tool_name, args_short, content)
+            self.log_error(f"Tool error in {tool_name}({args_short}): {content}")
 
         self.log_model("tool_result", {
             "tool_name": tool_name,
