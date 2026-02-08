@@ -190,9 +190,6 @@ git remote add agent ~/autofram-remote
 
 # Push current code to it
 git push agent main
-
-# Rebuild and run
-./launcher.sh rebuild
 ```
 
 ## To set up a working copy
@@ -201,6 +198,7 @@ git push agent main
 cd ..
 git clone ~/autofram-remote autofram-working
 cd autofram-working
+cp ../autofram/.env .
 ```
 
 ## To re-sync a working copy
@@ -208,4 +206,9 @@ cd autofram-working
 ```bash
 git fetch origin
 git reset --hard origin/main
+```
+
+```bash
+# Rebuild and run
+./launcher.sh rebuild
 ```
