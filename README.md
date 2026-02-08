@@ -212,3 +212,14 @@ git reset --hard origin/main
 # Rebuild and run
 ./launcher.sh rebuild
 ```
+
+# Save a Bare Repo
+
+a bare repo is just a git repo. You can push it to GitHub directly:
+
+```bash
+cd ~/autofram-remote
+git remote add github https://github.com/you/autofram-instance.git
+git push github --all
+git push github --tags
+```
