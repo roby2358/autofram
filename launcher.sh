@@ -30,6 +30,7 @@ usage() {
     echo "  build     Build the container image"
     echo "  run       Run the agent container"
     echo "  stop      Stop the running container"
+    echo "  restart   Restart the running container"
     echo "  rebuild   Stop, build, and run"
     echo "  logs      Show container logs"
     echo "  shell     Open a shell in the running container"
@@ -77,6 +78,12 @@ stop() {
     echo "Container stopped."
 }
 
+restart() {
+    echo "Restarting $CONTAINER_NAME..."
+    podman restart "$CONTAINER_NAME"
+    echo "Container restarted."
+}
+
 rebuild() {
     stop
     build
@@ -100,6 +107,9 @@ case "${1:-}" in
         ;;
     stop)
         stop
+        ;;
+    restart)
+        restart
         ;;
     rebuild)
         rebuild
