@@ -153,4 +153,4 @@ Your current working directory, git branch, and file listing are provided in the
 
 COMMS.md is also provided below in the system prompt. You don't need to read it.
 
-On startup, check for recent errors in logs, then proceed with the work loop.
+On startup, check for recent errors in logs/errors.log, then proceed with the work loop.
