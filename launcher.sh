@@ -29,7 +29,7 @@ run() {
     podman run -d \
         --name "$CONTAINER_NAME" \
         --cap-drop=ALL \
-        --cap-add=NET_ADMIN,SETUID,SETGID,CHOWN,FOWNER \
+        --cap-add=NET_ADMIN,SETUID,SETGID,CHOWN,FOWNER,DAC_OVERRIDE \
         --network pasta \
         -v "$REMOTE_REPO:/mnt/remote:z" \
         -p 8080:8080 \
