@@ -16,11 +16,11 @@ ALLOWED_TOOLS = [
 PROMPT_FILES = ["CONTRACTOR.md", "CODING.md"]
 
 
-def _log_to_errors(msg):
-    errors_log = Path.cwd() / "logs" / "errors.log"
-    errors_log.parent.mkdir(exist_ok=True)
+def _log_to_file(filename, msg):
+    logfile = Path.cwd() / "logs" / filename
+    logfile.parent.mkdir(exist_ok=True)
     timestamp = FileSystem.format_timestamp(UTC_FORMAT)
-    with open(errors_log, "a") as f:
+    with open(logfile, "a") as f:
         f.write(f"[{timestamp}] {msg}\n")
 
 
@@ -80,7 +80,9 @@ async def execute_contract(path):
             ),
         ):
             if hasattr(msg, "content"):
-                messages.append(str(msg.content))
+                content = str(msg.content)
+                log.info("[%s] %s", title, truncate_for_display(content))
+                _log_to_file("contracts.log", f"[{title}] {content}")
 
         log.info("Contract completed: %s", title)
         return f"completed: {title}"
@@ -90,7 +92,7 @@ async def execute_contract(path):
         log.error("Contract failed: %s — %s", title, truncate_for_display(str(e)))
         if stderr:
             log.error("Contract stderr: %s", truncate_for_display(stderr))
-        _log_to_errors(f"Contract failed: {title} — {e}\nstderr: {stderr}")
+        _log_to_file("errors.log", f"Contract failed: {title} — {e}\nstderr: {stderr}")
         return f"failed: {title} — {e}"
 
 
