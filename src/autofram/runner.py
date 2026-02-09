@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
@@ -137,7 +138,23 @@ class Runner:
         system_content = self.load_file_content(
             self.system_md, "# Autofram Agent\n\nNo SYSTEM.md found.\n"
         )
-        system_content += "\n\n---\n\n# COMMS.md\n\n"
+
+        # Add environment context
+        context_commands = [
+            "pwd",
+            "git branch --show-current",
+            "find . -type f",
+        ]
+        system_content += "\n\n---\n\n# Environment\n\n```\n"
+        for cmd in context_commands:
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                system_content += f"$ {cmd}\n{result.stdout.strip()}\n\n"
+            except Exception:
+                pass
+        system_content += "```\n"
+
+        system_content += "\n\n---\n\ncat COMMS.md\n\n"
         system_content += self.load_file_content(self.comms_md, "No COMMS.md found.\n")
         return system_content
 
@@ -266,7 +283,9 @@ class Runner:
         system_prompt = self.load_system_prompt()
         messages = self.build_messages(system_prompt)
 
-        logger.info("Calling LLM...")
+        last_msg = messages[-1]
+        logger.info("Calling LLM: [%s]: %s", last_msg.get("role", "?"),
+                     truncate_for_display(str(last_msg.get("content", ""))))
         self.log_model("request", {"messages": messages, "tools": self.tools})
 
         response = self.client.chat.completions.create(
