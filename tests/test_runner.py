@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from autofram.runner import Runner, logger as runner_logger
+from autofram.logger_out import log_bootstrap, setup_logging
 
 
 @pytest.fixture(autouse=True)
@@ -425,7 +426,7 @@ class TestSetupLogging:
         runner = Runner(working_dir=tmp_path)
         assert not runner.logs_dir.exists()
 
-        runner.setup_logging()
+        setup_logging(runner.logs_dir)
 
         assert runner.logs_dir.exists()
         self._cleanup_logger()
@@ -435,7 +436,7 @@ class TestSetupLogging:
         self._cleanup_logger()
         runner = Runner(working_dir=tmp_path)
 
-        runner.setup_logging()
+        setup_logging(runner.logs_dir)
 
         handler_types = [type(h) for h in runner_logger.handlers]
         assert logging.StreamHandler in handler_types
@@ -448,7 +449,7 @@ class TestSetupLogging:
         self._cleanup_logger()
         runner = Runner(working_dir=tmp_path)
 
-        runner.setup_logging()
+        setup_logging(runner.logs_dir)
         runner_logger.info("test log message")
 
         for h in runner_logger.handlers:
@@ -462,7 +463,7 @@ class TestSetupLogging:
         """Should set logger to INFO level."""
         runner = Runner(working_dir=tmp_path)
 
-        runner.setup_logging()
+        setup_logging(runner.logs_dir)
 
         assert runner_logger.level == logging.INFO
         self._cleanup_logger()
@@ -471,25 +472,25 @@ class TestSetupLogging:
 class TestLogBootstrap:
     """Tests for Runner.log_bootstrap."""
 
-    @patch("autofram.runner.Git.get_current_branch", return_value="main")
-    @patch("autofram.runner.FileSystem.format_timestamp", return_value="2024-01-15T10:00:00Z")
+    @patch("autofram.logger_out.Git.get_current_branch", return_value="main")
+    @patch("autofram.logger_out.FileSystem.format_timestamp", return_value="2024-01-15T10:00:00Z")
     def test_writes_to_bootstrap_log(self, mock_timestamp, mock_branch, tmp_path):
         """Should write status to bootstrap.log."""
         runner = Runner(working_dir=tmp_path)
-        runner.log_bootstrap("BOOTSTRAPPING")
+        log_bootstrap(runner.logs_dir, runner.bootstrap_log, runner.working_dir, "BOOTSTRAPPING")
 
         log_content = runner.bootstrap_log.read_text()
         assert "BOOTSTRAPPING" in log_content
         assert "2024-01-15T10:00:00Z" in log_content
         assert "main" in log_content
 
-    @patch("autofram.runner.Git.get_current_branch", return_value="main")
-    @patch("autofram.runner.FileSystem.format_timestamp", return_value="2024-01-15T10:00:00Z")
+    @patch("autofram.logger_out.Git.get_current_branch", return_value="main")
+    @patch("autofram.logger_out.FileSystem.format_timestamp", return_value="2024-01-15T10:00:00Z")
     def test_creates_logs_directory(self, mock_timestamp, mock_branch, tmp_path):
         """Should create logs directory if needed."""
         runner = Runner(working_dir=tmp_path)
         assert not runner.logs_dir.exists()
 
-        runner.log_bootstrap("TEST")
+        log_bootstrap(runner.logs_dir, runner.bootstrap_log, runner.working_dir, "TEST")
 
         assert runner.logs_dir.exists()
