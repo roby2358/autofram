@@ -29,9 +29,10 @@ nft add rule inet filter output ip daddr 172.16.0.0/12 drop 2>/dev/null || true
 nft add rule inet filter output ip daddr 192.168.0.0/16 drop 2>/dev/null || true
 nft add rule inet filter output ip daddr 169.254.0.0/16 drop 2>/dev/null || true
 
-# Clone as agent user so files are agent-owned
+# Clone and hand off
 if [ ! -d "$WORKDIR" ]; then
-    runuser -u agent -- git clone "$REMOTE_REPO" "$WORKDIR"
+    git clone "$REMOTE_REPO" "$WORKDIR"
 fi
+chown -R agent:agent /agent
 
 exec "$WORKDIR/bootstrap.sh"
