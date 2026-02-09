@@ -283,32 +283,22 @@ class TestCalculateSleepSeconds:
 
 
 class TestTruncateForDisplay:
-    """Tests for Runner.truncate_for_display."""
+    """Tests for truncate_for_display."""
 
     def test_short_text_unchanged(self):
-        """Short text should be returned unchanged."""
-        runner = Runner()
-        text = "short"
-        result = runner.truncate_for_display(text)
-        assert result == text
+        from autofram.logger_out import truncate_for_display
+        assert truncate_for_display("short") == "short"
 
     def test_long_text_truncated(self):
-        """Long text should be truncated with ellipsis."""
-        runner = Runner()
-        text = "x" * 500
-        result = runner.truncate_for_display(text)
-
-        assert len(result) < len(text)
+        from autofram.logger_out import truncate_for_display
+        result = truncate_for_display("x" * 500)
+        assert len(result) < 500
         assert result.endswith("...")
 
     def test_truncation_length(self):
-        """Should truncate to DISPLAY_TRUNCATE_LENGTH."""
-        runner = Runner()
-        text = "x" * 500
-        result = runner.truncate_for_display(text)
-
-        expected_length = runner.DISPLAY_TRUNCATE_LENGTH + 3  # +3 for "..."
-        assert len(result) == expected_length
+        from autofram.logger_out import truncate_for_display, MAX_DISPLAY_LENGTH
+        result = truncate_for_display("x" * 500)
+        assert len(result) == MAX_DISPLAY_LENGTH + 3
 
 
 class TestBuildMessages:
