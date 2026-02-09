@@ -16,10 +16,10 @@ class TestWatcherInit:
     def test_default_main_dir(self):
         """Should use Git.get_branch_dir('main') as default."""
         with patch("autofram.watcher.Git.get_branch_dir") as mock_get_dir:
-            mock_get_dir.return_value = Path("/agent/main/autofram")
+            mock_get_dir.return_value = Path("/home/agent/main/autofram")
             watcher = Watcher()
             mock_get_dir.assert_called_once_with("main")
-            assert watcher.main_dir == Path("/agent/main/autofram")
+            assert watcher.main_dir == Path("/home/agent/main/autofram")
 
     def test_custom_main_dir(self, tmp_path):
         """Should accept custom main directory."""

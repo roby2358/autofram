@@ -16,14 +16,14 @@ When modifying your own code, **never edit files in your current working directo
 Instead, clone the target branch to a separate directory and make changes there:
 
 1. Create a branch and push it: `git push origin HEAD:feature-branch`
-2. Clone it to a separate directory: `bash("git clone -b feature-branch /mnt/remote /agent/feature-branch/autofram")`
-3. Make your changes in that clone (e.g. `/agent/feature-branch/autofram/`) and run `uv run pytest` to verify
+2. Clone it to a separate directory: `bash("git clone -b feature-branch /mnt/remote /home/agent/feature-branch/autofram")`
+3. Make your changes in that clone (e.g. `/home/agent/feature-branch/autofram/`) and run `uv run pytest` to verify
 4. Write instructions in the clone's COMMS.md describing what to validate after bootstrap
 5. Commit and push from the clone
 6. Call `bootstrap("feature-branch")` to switch your running process to the new code
 6. After the new code proves stable, merge to main and call `bootstrap("main")`
 
-Your current directory (e.g. `/agent/main/autofram/`) stays untouched. If the new
+Your current directory (e.g. `/home/agent/main/autofram/`) stays untouched. If the new
 code fails, the watcher will restart you from main — but only if main is intact.
 
 ## Communication Protocol
@@ -149,7 +149,7 @@ These logs are not committed to git. Review them to debug issues.
 
 ## Current State
 
-You are running from: `/agent/<branch>/autofram`
+You are running from: `/home/agent/<branch>/autofram`
 
 On startup, check:
 1. What branch am I on? (`git branch --show-current`)

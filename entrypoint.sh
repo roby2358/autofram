@@ -5,7 +5,7 @@ set -e
 
 # Configuration
 REMOTE_REPO="/mnt/remote"
-AGENT_BASE="/agent"
+AGENT_BASE="/home/agent"
 BRANCH="main"
 WORKDIR="$AGENT_BASE/$BRANCH/autofram"
 
@@ -34,6 +34,6 @@ nft add rule inet filter output ip daddr 169.254.0.0/16 drop 2>/dev/null || true
 if [ ! -d "$WORKDIR" ]; then
     git clone "$REMOTE_REPO" "$WORKDIR"
 fi
-chown -R agent:agent /agent
+chown -R agent:agent /home/agent
 
 exec "$WORKDIR/bootstrap.sh"

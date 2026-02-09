@@ -56,7 +56,7 @@ case "${1:-}" in
     restart)  podman stop -t 30 "$CONTAINER_NAME" && podman start "$CONTAINER_NAME" ;;
     rebuild)  stop; build; run ;;
     logs)     podman logs -f "$CONTAINER_NAME" ;;
-    shell)    podman exec -it "$CONTAINER_NAME" /bin/bash ;;
+    shell)    podman exec -it -w /home/agent "$CONTAINER_NAME" /bin/bash ;;
     *)
         echo "Usage: $0 {build|run|stop|restart|rebuild|logs|shell}"
         exit 1

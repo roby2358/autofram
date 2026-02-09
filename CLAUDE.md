@@ -76,4 +76,4 @@ All logs in `logs/` under the working directory. Format: `%(asctime)s %(levelnam
 - PostgreSQL available inside the container
 - Network: RFC1918/link-local blocked via nftables; outbound internet allowed
 - Bare repo bind-mounted at `/mnt/remote` (git remote for pull/push)
-- Working directory: `/agent/<branch>/autofram/`
+- Working directory: `/home/agent/<branch>/autofram/`

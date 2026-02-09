@@ -4,7 +4,7 @@ You have been spawned to complete a specific contract. The contract file path an
 
 ## Environment
 - You are in a sandboxed container with no network restrictions
-- Working directory: /agent/<branch>/autofram/
+- Working directory: /home/agent/<branch>/autofram/
 - Source code: src/autofram/
 - Tests: tests/
 - Static files: static/

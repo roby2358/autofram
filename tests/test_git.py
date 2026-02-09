@@ -17,22 +17,22 @@ class TestConstants:
         assert Git.REMOTE_REPO == Path("/mnt/remote")
 
     def test_agent_dir_path(self):
-        """AGENT_DIR should be /agent."""
-        assert Git.AGENT_DIR == Path("/agent")
+        """AGENT_DIR should be /home/agent."""
+        assert Git.AGENT_DIR == Path("/home/agent")
 
 
 class TestGetBranchDir:
     """Tests for Git.get_branch_dir."""
 
     def test_main_branch_dir(self):
-        """Main branch should return /agent/main/autofram."""
+        """Main branch should return /home/agent/main/autofram."""
         result = Git.get_branch_dir("main")
-        assert result == Path("/agent/main/autofram")
+        assert result == Path("/home/agent/main/autofram")
 
     def test_feature_branch_dir(self):
         """Feature branch should return correct path."""
         result = Git.get_branch_dir("feature-x")
-        assert result == Path("/agent/feature-x/autofram")
+        assert result == Path("/home/agent/feature-x/autofram")
 
     def test_returns_path_object(self):
         """Result should be a Path object."""

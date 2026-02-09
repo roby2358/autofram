@@ -15,7 +15,6 @@ RUN useradd -m -s /bin/bash agent \
     && printf '#!/bin/bash\nexec runuser -u agent -- "${0}.real" "$@"\n' > "$CLAUDE" \
     && chmod +x "$CLAUDE"
 
-RUN mkdir -p /agent
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

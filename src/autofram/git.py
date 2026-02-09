@@ -8,7 +8,7 @@ class Git:
     """Git operations wrapper."""
 
     REMOTE_REPO = Path("/mnt/remote")
-    AGENT_DIR = Path("/agent")
+    AGENT_DIR = Path("/home/agent")
 
     @staticmethod
     def get_branch_dir(branch: str) -> Path:
