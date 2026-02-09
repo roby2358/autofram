@@ -4,6 +4,9 @@ from pathlib import Path
 
 import claude_code_sdk
 
+from autofram.filesystem import UTC_FORMAT, FileSystem
+from autofram.logger_out import truncate_for_display
+
 log = logging.getLogger(__name__)
 
 MAX_TURNS = 30
@@ -11,6 +14,14 @@ ALLOWED_TOOLS = [
     "Read", "Edit", "Write", "Bash", "Glob", "Grep", "WebSearch", "WebFetch"
 ]
 PROMPT_FILES = ["CONTRACTOR.md", "CODING.md"]
+
+
+def _log_to_errors(msg):
+    errors_log = Path.cwd() / "logs" / "errors.log"
+    errors_log.parent.mkdir(exist_ok=True)
+    timestamp = FileSystem.format_timestamp(UTC_FORMAT)
+    with open(errors_log, "a") as f:
+        f.write(f"[{timestamp}] {msg}\n")
 
 
 def contracts_dir():
@@ -75,7 +86,11 @@ async def execute_contract(path):
         return f"completed: {title}"
 
     except Exception as e:
-        log.error("Contract failed: %s — %s", title, e)
+        stderr = getattr(e, "stderr", "")
+        log.error("Contract failed: %s — %s", title, truncate_for_display(str(e)))
+        if stderr:
+            log.error("Contract stderr: %s", truncate_for_display(stderr))
+        _log_to_errors(f"Contract failed: {title} — {e}\nstderr: {stderr}")
         return f"failed: {title} — {e}"
 
 
