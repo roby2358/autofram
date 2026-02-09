@@ -182,8 +182,7 @@ class Runner:
         except IsADirectoryError:
             path = tool_args.get('path', '')
             content = f"Error: '{path}' is a directory, not a file. Use bash('ls {path}') to list its contents."
-            args_short = truncate_for_display(str(tool_args))
-            logger.info("Tool: %s(%s) — is a directory", tool_name, args_short)
+            logger.info("Result: %s", truncate_for_display(content))
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
             args_short = truncate_for_display(str(tool_args))
@@ -228,10 +227,9 @@ class Runner:
             )
             follow_up = response.choices[0].message
             self.log_model("response", follow_up.model_dump())
+            logger.info("Response: %s", truncate_for_display(str(follow_up.content)))
 
             if not follow_up.tool_calls:
-                if follow_up.content:
-                    logger.info("Response: %s", truncate_for_display(follow_up.content))
                 break
 
             nested_results = [self.execute_tool_call(tc) for tc in follow_up.tool_calls]
@@ -280,11 +278,10 @@ class Runner:
 
         message = response.choices[0].message
         self.log_model("response", message.model_dump())
+        logger.info("Response: %s", truncate_for_display(str(message.content)))
 
         if message.tool_calls:
             self.process_tool_calls(message, messages)
-        elif message.content:
-            logger.info("Response: %s", truncate_for_display(message.content))
 
         self._last_comms_hash = self.hash_comms()
 
