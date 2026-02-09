@@ -7,11 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     less \
     nftables \
     nodejs \
+    npm \
     postgresql \
     procps \
     vim \
     && rm -rf /var/lib/apt/lists/* \
     && echo "alias ll='ls -lA'" >> /etc/bash.bashrc
+
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
 
 # Install uv package manager
 RUN pip install --no-cache-dir uv
