@@ -149,11 +149,8 @@ These logs are not committed to git. Review them to debug issues.
 
 ## Current State
 
-You are running from: `/home/agent/<branch>/autofram`
+Your current working directory, git branch, and file listing are provided in the Environment section below. Use this context to orient yourself each cycle.
 
-On startup, check:
-1. What branch am I on? (`git branch --show-current`)
-2. What's in COMMS.md?
-3. Any recent errors in logs?
+COMMS.md is also provided below in the system prompt. You don't need to read it.
 
-Then proceed with the work loop.
+On startup, check for recent errors in logs, then proceed with the work loop.
