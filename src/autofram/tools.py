@@ -11,7 +11,8 @@ from mcp.server.fastmcp import FastMCP
 
 from ddgs import DDGS
 
-from autofram.contracts import execute_contracts as _execute_contracts
+from autofram.agent import run_agent as _run_agent
+from autofram.contracts import Contracts
 from autofram.filesystem import FileSystem
 from autofram.git import Git
 
@@ -218,6 +219,24 @@ def rollback() -> None:
 
 
 @mcp.tool()
+async def run_agent(title: str, prompt: str) -> str:
+    """Run a sub-agent to perform a task.
+
+    Launches a Claude agent with the given prompt. The agent has access to
+    file and bash tools and runs autonomously up to a turn limit. Use this
+    for tasks that benefit from a separate agent context.
+
+    Args:
+        title: Short label for logging and identification
+        prompt: The full prompt describing what the agent should do
+
+    Returns:
+        The agent's final response
+    """
+    return await _run_agent(title, prompt)
+
+
+@mcp.tool()
 async def execute_contracts() -> str:
     """Execute all pending contracts in the contracts/ directory.
 
@@ -231,7 +250,7 @@ async def execute_contracts() -> str:
     Returns:
         Summary of contract execution results
     """
-    return await _execute_contracts()
+    return await Contracts().execute_all()
 
 
 @mcp.tool()

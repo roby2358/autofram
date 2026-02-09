@@ -2,109 +2,76 @@ import logging
 import re
 from pathlib import Path
 
-import claude_code_sdk
-
-from autofram.filesystem import UTC_FORMAT, FileSystem
-from autofram.logger_out import truncate_for_display
+from autofram.agent import run_agent
+from autofram.logger_out import log_error, logs_dir, truncate_for_display
 
 log = logging.getLogger(__name__)
-
-MAX_TURNS = 30
-ALLOWED_TOOLS = [
-    "Read", "Edit", "Write", "Bash", "Glob", "Grep", "WebSearch", "WebFetch"
-]
-PROMPT_FILES = ["CONTRACTOR.md", "CODING.md"]
-
-
-def _log_to_file(filename, msg):
-    logfile = Path.cwd() / "logs" / filename
-    logfile.parent.mkdir(exist_ok=True)
-    timestamp = FileSystem.format_timestamp(UTC_FORMAT)
-    with open(logfile, "a") as f:
-        f.write(f"[{timestamp}] {msg}\n")
 
 
 def contracts_dir():
     return Path.cwd() / "contracts"
 
 
-def prompts_dir():
-    return Path.cwd() / "static" / "prompts"
+def contracts_completed_dir():
+    return Path.cwd() / "contracts_completed"
 
 
-def _build_system_prompt():
-    parts = [(prompts_dir() / name).read_text().strip() for name in PROMPT_FILES]
-    return "\n\n---\n\n".join(parts)
+class Contracts:
+    @staticmethod
+    def _parse_title(text):
+        match = re.search(r"^# (.+)$", text, re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+        for line in text.splitlines():
+            if line.strip():
+                return line.strip()
+        return "empty"
 
+    @staticmethod
+    def _is_pending(text):
+        return bool(re.search(r"^pending\s*$", text, re.MULTILINE))
 
-def _parse_title(text):
-    match = re.search(r"^# (.+)$", text, re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    for line in text.splitlines():
-        if line.strip():
-            return line.strip()
-    return "empty"
+    @staticmethod
+    def _find_pending():
+        cdir = contracts_dir()
+        if not cdir.exists():
+            return []
+        return [p for p in sorted(cdir.glob("*.md")) if Contracts._is_pending(p.read_text())]
 
+    async def execute(self, path):
+        path = Path(path)
+        text = path.read_text()
+        title = Contracts._parse_title(text)
+        log.info("Executing contract: %s", title)
 
-def _is_pending(text):
-    return bool(re.search(r"^pending\s*$", text, re.MULTILINE))
+        prompt = f"Contract file: {path.resolve()}\n\n{text}"
 
+        try:
+            last_content = await run_agent(title, prompt)
 
-def _find_pending():
-    cdir = contracts_dir()
-    if not cdir.exists():
-        return []
-    return [p for p in sorted(cdir.glob("*.md")) if _is_pending(p.read_text())]
+            dest = contracts_completed_dir()
+            dest.mkdir(exist_ok=True)
+            path.rename(dest / path.name)
+            log.info("Contract completed: %s", title)
+            return f"completed: {title}\nsummary: {last_content}"
 
+        except Exception as e:
+            stderr = getattr(e, "stderr", "")
+            log.error("Contract failed: %s — %s", title, truncate_for_display(str(e)))
+            if stderr:
+                log.error("Contract stderr: %s", truncate_for_display(stderr))
+            log_error(logs_dir() / "errors.log", f"Contract failed: {title} — {e}\nstderr: {stderr}")
+            return f"failed: {title} — {e}"
 
-async def execute_contract(path):
-    path = Path(path)
-    text = path.read_text()
-    title = _parse_title(text)
-    log.info("Executing contract: %s", title)
+    async def execute_all(self):
+        pending = Contracts._find_pending()
+        if not pending:
+            return "No pending contracts found."
 
-    prompt = f"Contract file: {path.resolve()}\n\n{text}"
+        results = []
+        for path in pending:
+            results.append(await self.execute(path))
 
-    try:
-        messages = []
-        async for msg in claude_code_sdk.query(
-            prompt=prompt,
-            options=claude_code_sdk.ClaudeCodeOptions(
-                model="sonnet",
-                max_turns=MAX_TURNS,
-                permission_mode="bypassPermissions",
-                allowed_tools=ALLOWED_TOOLS,
-                cwd=str(Path.cwd()),
-                system_prompt=_build_system_prompt(),
-            ),
-        ):
-            if hasattr(msg, "content"):
-                content = str(msg.content)
-                log.info("[%s] %s", title, truncate_for_display(content))
-                _log_to_file("contracts.log", f"[{title}] {content}")
-
-        log.info("Contract completed: %s", title)
-        return f"completed: {title}"
-
-    except Exception as e:
-        stderr = getattr(e, "stderr", "")
-        log.error("Contract failed: %s — %s", title, truncate_for_display(str(e)))
-        if stderr:
-            log.error("Contract stderr: %s", truncate_for_display(stderr))
-        _log_to_file("errors.log", f"Contract failed: {title} — {e}\nstderr: {stderr}")
-        return f"failed: {title} — {e}"
-
-
-async def execute_contracts():
-    pending = _find_pending()
-    if not pending:
-        return "No pending contracts found."
-
-    results = []
-    for path in pending:
-        results.append(await execute_contract(path))
-
-    summary = f"Executed {len(results)} contract(s):\n"
-    summary += "\n".join(f"- {r}" for r in results)
-    return summary
+        summary = f"Executed {len(results)} contract(s):\n"
+        summary += "\n".join(f"- {r}" for r in results)
+        return summary

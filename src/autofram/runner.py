@@ -116,7 +116,7 @@ class Runner:
             content = f"Error: {type(e).__name__}: {e}"
             args_short = truncate_for_display(str(tool_args))
             logger.error("Tool error in %s(%s): %s", tool_name, args_short, content)
-            log_error(self.logs_dir, self.errors_log,f"Tool error in {tool_name}({args_short}): {content}")
+            log_error(self.errors_log, f"Tool error in {tool_name}({args_short}): {content}")
 
         log_model(self.logs_dir, self.model_log,"tool_result", {
             "tool_name": tool_name,

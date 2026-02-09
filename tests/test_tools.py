@@ -208,7 +208,7 @@ class TestExecuteTool:
 
     def test_raises_on_unknown_tool(self):
         """Should raise ValueError for unknown tool."""
-        with pytest.raises(ValueError, match="Unknown tool"):
+        with pytest.raises(ValueError, match="does not exist"):
             execute_tool("nonexistent_tool", {})
 
     def test_returns_string(self, tmp_path):

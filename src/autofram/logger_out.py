@@ -2,12 +2,17 @@ import json
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from autofram.filesystem import UTC_FORMAT, FileSystem
 from autofram.git import Git
 
 
 MAX_DISPLAY_LENGTH = 80
+
+
+def logs_dir():
+    return Path.cwd() / "logs"
 
 logger = logging.getLogger("autofram.runner")
 
@@ -69,8 +74,12 @@ def log_model(logs_dir, model_log, direction, data):
         f.write(json.dumps(entry) + "\n")
 
 
-def log_error(logs_dir, errors_log, error_msg):
-    logs_dir.mkdir(exist_ok=True)
+def log_to_file(logfile, msg):
+    logfile.parent.mkdir(exist_ok=True)
     timestamp = FileSystem.format_timestamp(UTC_FORMAT)
-    with open(errors_log, "a") as f:
-        f.write(f"[{timestamp}] {error_msg}\n")
+    with open(logfile, "a") as f:
+        f.write(f"[{timestamp}] {msg}\n")
+
+
+def log_error(errors_log, error_msg):
+    log_to_file(errors_log, error_msg)
