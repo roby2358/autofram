@@ -16,6 +16,7 @@ fi
 
 git config --global user.name "${GIT_USER_NAME:-autofram}"
 git config --global user.email "${GIT_USER_EMAIL:-autofram@localhost}"
+git config --global --add safe.directory '*'
 
 # Network isolation (static for security - agent cannot modify)
 nft add table inet filter 2>/dev/null || true
