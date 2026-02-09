@@ -172,7 +172,8 @@ class Runner:
             Tool result message dict for the conversation
         """
         tool_name = tool_call.function.name
-        tool_args = json.loads(tool_call.function.arguments)
+        raw_args = tool_call.function.arguments or "{}"
+        tool_args = json.loads(raw_args)
         logger.info("Tool: %s(%s)", tool_name, truncate_for_display(str(tool_args)))
 
         try:
