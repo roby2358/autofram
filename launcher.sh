@@ -80,7 +80,7 @@ stop() {
 
 restart() {
     echo "Restarting $CONTAINER_NAME..."
-    podman restart "$CONTAINER_NAME"
+    podman restart -t 30 "$CONTAINER_NAME"
     echo "Container restarted."
 }
 

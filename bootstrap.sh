@@ -19,4 +19,8 @@ export AUTOFRAM_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 # Launch services
 python "$REPO_DIR/src/autofram/server.py" &
 python "$REPO_DIR/src/autofram/watcher.py" &
-exec python "$REPO_DIR/src/autofram/runner.py"
+python "$REPO_DIR/src/autofram/runner.py" &
+
+# Forward SIGTERM to all children for clean shutdown
+trap 'kill 0' SIGTERM
+wait
