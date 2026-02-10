@@ -12,7 +12,7 @@ from pathlib import Path
 
 def main():
     credentials_path = Path.home() / ".claude" / ".credentials.json"
-    env_path = Path(__file__).parent / ".env"
+    env_path = Path.cwd() / ".env"
 
     if not credentials_path.exists():
         print(f"Error: {credentials_path} not found")
