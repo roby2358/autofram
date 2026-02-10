@@ -12,6 +12,14 @@ cd "$REPO_DIR"
 # Dependencies
 uv pip install --system -e .
 
+# Wrap bundled Claude CLI to run as agent user (SDK refuses to run as root)
+BUNDLED_CLAUDE="/usr/local/lib/python3.12/site-packages/claude_agent_sdk/_bundled/claude"
+if [ -f "$BUNDLED_CLAUDE" ] && [ ! -f "$BUNDLED_CLAUDE.real" ]; then
+    mv "$BUNDLED_CLAUDE" "$BUNDLED_CLAUDE.real"
+    printf '#!/bin/bash\nexec runuser -u agent -- "${0}.real" "$@"\n' > "$BUNDLED_CLAUDE"
+    chmod +x "$BUNDLED_CLAUDE"
+fi
+
 # Setup
 mkdir -p "$REPO_DIR/logs"
 export AUTOFRAM_BRANCH=$(git rev-parse --abbrev-ref HEAD)
