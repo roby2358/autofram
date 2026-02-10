@@ -15,17 +15,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from autofram.git import Git
-from autofram.logger_out import (
-    log_bootstrap, log_error, log_model,
-    setup_error_logging, setup_logging, truncate_for_display,
-)
+from autofram.logger_out import LoggerOut
 from autofram.tools import execute_tool, get_tools_for_openai
 
 # Load environment variables
 load_dotenv()
-
-
-logger = logging.getLogger("autofram.runner")
 
 
 class Runner:
@@ -44,10 +38,7 @@ class Runner:
         self.work_interval_minutes = int(os.environ["WORK_INTERVAL_MINUTES"])
         self.system_md = self.working_dir / "static" / "prompts" / "SYSTEM.md"
         self.comms_md = self.working_dir / "COMMS.md"
-        self.logs_dir = self.working_dir / "logs"
-        self.bootstrap_log = self.logs_dir / "bootstrap.log"
-        self.errors_log = self.logs_dir / "errors.log"
-        self.model_log = self.logs_dir / "model.log"
+        self.log = LoggerOut()
 
         self.api_key = os.environ.get("OPENROUTER_API_KEY")
         self.model = os.environ.get("OPENROUTER_MODEL")
@@ -103,22 +94,22 @@ class Runner:
         tool_name = tool_call.function.name
         raw_args = tool_call.function.arguments or "{}"
         tool_args = json.loads(raw_args)
-        logger.info("Tool: %s(%s)", tool_name, truncate_for_display(str(tool_args)))
+        self.log.stdlog.info("Tool: %s(%s)", tool_name, LoggerOut.truncate_for_display(str(tool_args)))
 
         try:
             content = execute_tool(tool_name, tool_args)
-            logger.info("Result: %s", truncate_for_display(content))
+            self.log.stdlog.info("Result: %s", LoggerOut.truncate_for_display(content))
         except IsADirectoryError:
             path = tool_args.get('path', '')
             content = f"Error: '{path}' is a directory, not a file. Use bash('ls {path}') to list its contents."
-            logger.info("Result: %s", truncate_for_display(content))
+            self.log.stdlog.info("Result: %s", LoggerOut.truncate_for_display(content))
         except Exception as e:
             content = f"Error: {type(e).__name__}: {e}"
-            args_short = truncate_for_display(str(tool_args))
-            logger.error("Tool error in %s(%s): %s", tool_name, args_short, content)
-            log_error(self.errors_log, f"Tool error in {tool_name}({args_short}): {content}")
+            args_short = LoggerOut.truncate_for_display(str(tool_args))
+            self.log.stdlog.error("Tool error in %s(%s): %s", tool_name, args_short, content)
+            self.log.errors.error(f"Tool error in {tool_name}({args_short}): {content}")
 
-        log_model(self.logs_dir, self.model_log,"tool_result", {
+        self.log.model("tool_result", {
             "tool_name": tool_name,
             "tool_args": tool_args,
             "tool_call_id": tool_call.id,
@@ -146,7 +137,7 @@ class Runner:
 
         # Handle nested tool calls
         while True:
-            log_model(self.logs_dir, self.model_log,"request", {"messages": messages, "tools": self.tools})
+            self.log.model("request", {"messages": messages, "tools": self.tools})
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -155,8 +146,8 @@ class Runner:
                 tool_choice="auto",
             )
             follow_up = response.choices[0].message
-            log_model(self.logs_dir, self.model_log,"response", follow_up.model_dump())
-            logger.info("Response: %s", truncate_for_display(str(follow_up.content)))
+            self.log.model("response", follow_up.model_dump())
+            self.log.stdlog.info("Response: %s", LoggerOut.truncate_for_display(str(follow_up.content)))
 
             if not follow_up.tool_calls:
                 break
@@ -175,7 +166,7 @@ class Runner:
     def create_client(self) -> OpenAI:
         """Create and return the OpenAI client configured for OpenRouter."""
         if not self.api_key:
-            logger.error("OPENROUTER_API_KEY not set")
+            self.log.stdlog.error("OPENROUTER_API_KEY not set")
             sys.exit(1)
 
         return OpenAI(
@@ -201,7 +192,7 @@ class Runner:
         sleep_seconds = self.calculate_sleep_seconds()
         if sleep_seconds > 0:
             next_time = datetime.now() + timedelta(seconds=sleep_seconds)
-            logger.info("Sleeping until %s (%ds)", next_time.strftime("%H:%M"), sleep_seconds)
+            self.log.stdlog.info("Sleeping until %s (%ds)", next_time.strftime("%H:%M"), sleep_seconds)
             time.sleep(sleep_seconds)
 
     def hash_comms(self) -> str | None:
@@ -216,16 +207,16 @@ class Runner:
 
         comms_hash = self.hash_comms()
         if comms_hash == self._last_comms_hash:
-            logger.info("COMMS.md unchanged, skipping cycle")
+            self.log.stdlog.info("COMMS.md unchanged, skipping cycle")
             return
 
         system_prompt = self.load_system_prompt()
         messages = self.build_messages(system_prompt)
 
         last_msg = messages[-1]
-        logger.info("Calling LLM: [%s]: %s", last_msg.get("role", "?"),
-                     truncate_for_display(str(last_msg.get("content", ""))))
-        log_model(self.logs_dir, self.model_log,"request", {"messages": messages, "tools": self.tools})
+        self.log.stdlog.info("Calling LLM: [%s]: %s", last_msg.get("role", "?"),
+                     LoggerOut.truncate_for_display(str(last_msg.get("content", ""))))
+        self.log.model("request", {"messages": messages, "tools": self.tools})
 
         response = self.client.chat.completions.create(
             model=self.model,
@@ -235,8 +226,8 @@ class Runner:
         )
 
         message = response.choices[0].message
-        log_model(self.logs_dir, self.model_log,"response", message.model_dump())
-        logger.info("Response: %s", truncate_for_display(str(message.content)))
+        self.log.model("response", message.model_dump())
+        self.log.stdlog.info("Response: %s", LoggerOut.truncate_for_display(str(message.content)))
 
         if message.tool_calls:
             self.process_tool_calls(message, messages)
@@ -245,15 +236,15 @@ class Runner:
 
     def start(self) -> None:
         """Main entry point."""
-        log_bootstrap(self.logs_dir, self.bootstrap_log, self.working_dir,"BOOTSTRAPPING")
-        setup_error_logging(self.logs_dir, self.errors_log)
-        setup_logging(self.logs_dir)
-        log_bootstrap(self.logs_dir, self.bootstrap_log, self.working_dir,"SUCCESS")
+        self.log.bootstrap(self.working_dir, "BOOTSTRAPPING")
+        self.log.redirect_stderr()
+        self.log.setup()
+        self.log.bootstrap(self.working_dir, "SUCCESS")
 
-        logger.info("Autofram Runner starting in %s", self.working_dir)
-        logger.info("Branch: %s", Git.get_current_branch(self.working_dir))
-        logger.info("Model: %s", self.model)
-        logger.info("Bootstrap successful, entering main loop...")
+        self.log.stdlog.info("Autofram Runner starting in %s", self.working_dir)
+        self.log.stdlog.info("Branch: %s", Git.get_current_branch(self.working_dir))
+        self.log.stdlog.info("Model: %s", self.model)
+        self.log.stdlog.info("Bootstrap successful, entering main loop...")
         self.run()
 
     def run(self) -> None:
@@ -267,10 +258,10 @@ class Runner:
                 self.sleep_until_next_interval()
 
             except KeyboardInterrupt:
-                logger.info("Shutdown requested.")
+                self.log.stdlog.info("Shutdown requested.")
                 break
             except Exception as e:
-                logger.error("LLM loop error: %s: %s", type(e).__name__, e)
+                self.log.stdlog.error("LLM loop error: %s: %s", type(e).__name__, e)
                 time.sleep(self.RETRY_DELAY_SECONDS)
 
 def main() -> None:
