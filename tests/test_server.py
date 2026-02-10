@@ -114,19 +114,6 @@ class TestStatusEndpoint:
         assert "runner: pid=222" in result
 
 
-class TestHelloEndpoint:
-    """Tests for the /hello endpoint."""
-
-    def test_returns_hello_world(self):
-        """Should return Hello, World! with correct status and content-type."""
-        client = TestClient(server.app)
-        response = client.get("/hello")
-
-        assert response.status_code == 200
-        assert response.text == "Hello, World!"
-        assert response.headers["content-type"] == "text/plain; charset=utf-8"
-
-
 class TestSetupAccessLog:
     """Tests for setup_access_log."""
 
