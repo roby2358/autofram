@@ -56,8 +56,34 @@ class Contracts:
             return f"completed: {title}\nsummary: {last_content}"
 
         except Exception as e:
+            error_msg = str(e)
             stderr = getattr(e, "stderr", "")
-            log.error("Contract failed: %s — %s", title, truncate_for_display(str(e)))
+
+            # Detect OAuth token expiration
+            is_token_expired = any(phrase in error_msg.lower() for phrase in [
+                "oauth token has expired",
+                "authentication_error",
+                "token has expired",
+                "token expired"
+            ])
+
+            if is_token_expired:
+                alert_file = Path.cwd() / "TOKEN_EXPIRED.txt"
+                alert_msg = (
+                    "CLAUDE_CODE_OAUTH_TOKEN has expired!\n\n"
+                    "To fix:\n"
+                    "1. Run: claude login\n"
+                    "2. Copy the new token\n"
+                    "3. Update CLAUDE_CODE_OAUTH_TOKEN in .env\n"
+                    "4. Restart: ./launcher.sh stop && ./launcher.sh run\n\n"
+                    f"Error: {error_msg}\n"
+                )
+                alert_file.write_text(alert_msg)
+                log.error("=" * 60)
+                log.error("OAUTH TOKEN EXPIRED - See TOKEN_EXPIRED.txt for instructions")
+                log.error("=" * 60)
+
+            log.error("Contract failed: %s — %s", title, truncate_for_display(error_msg))
             if stderr:
                 log.error("Contract stderr: %s", truncate_for_display(stderr))
             log_error(logs_dir() / "errors.log", f"Contract failed: {title} — {e}\nstderr: {stderr}")
