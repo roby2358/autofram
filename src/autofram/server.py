@@ -85,6 +85,12 @@ def status() -> str:
     return "\n".join(lines)
 
 
+@app.get("/hello", response_class=PlainTextResponse)
+def hello() -> str:
+    """Return a simple hello world message."""
+    return "Hello, World!"
+
+
 def setup_access_log(log_path: Path) -> None:
     """Configure uvicorn access logging to a file."""
     log_path.parent.mkdir(exist_ok=True)
