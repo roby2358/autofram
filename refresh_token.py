@@ -30,10 +30,16 @@ def main():
         print(f"Error: Failed to parse {credentials_path}: {e}")
         sys.exit(1)
 
-    token = credentials.get("claudeAiOauth")
-    if not token:
+    oauth_data = credentials.get("claudeAiOauth")
+    if not oauth_data:
         print("Error: No 'claudeAiOauth' found in credentials file")
         print(f"Available keys: {list(credentials.keys())}")
+        sys.exit(1)
+
+    token = oauth_data.get("accessToken")
+    if not token:
+        print("Error: No 'accessToken' found in claudeAiOauth object")
+        print(f"Available keys: {list(oauth_data.keys())}")
         sys.exit(1)
 
     env_content = env_path.read_text()
