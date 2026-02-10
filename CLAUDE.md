@@ -17,6 +17,16 @@ Autofram is a sandboxed, self-modifying AI agent that communicates with the outs
 
 Requires a `.env` file (copy from `.env.example`). Key vars: `OPENROUTER_API_KEY`, `AUTOFRAM_REMOTE` (path to bare git repo).
 
+## Git Workflow
+
+**IMPORTANT:** This repo has a one-way relationship with the bare repo:
+
+- **Push only:** Changes from this repo push TO the bare repo (which the container clones from)
+- **Never pull:** Do NOT pull changes FROM the bare repo back to this repo
+- **Why:** The container/agent will make experimental changes, tests, and modifications that will get messy. This repo should remain clean and reflect basic autofram functionality.
+
+The bare repo and container are the "laboratory" — this repo is the "reference implementation."
+
 ## Testing
 
 ```bash
